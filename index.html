@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Débora Aparecida Nail Design</title><meta name="description" content="Mais que unhas, um momento só seu.">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<header class="topbar"><div class="brand"><span>Débora Nail</span><small>♡ CLUBE VIP</small></div>
+<button class="menu-btn" id="menuBtn">☰</button>
+<nav id="nav"><a href="#inicio">Início</a><a href="#servicos">Serviços</a><a href="#vip">VIP</a><a href="#sobre">Sobre</a><a href="#galeria">Galeria</a><a href="#contato">Contato</a><button class="outline-btn" id="loginBtn">Área VIP</button></nav></header>
+<main>
+<section class="hero" id="inicio"><div class="hero-text"><span class="eyebrow">CLUBE VIP · DÉBORA NAIL</span><h1>Mais que unhas,<br><em>um momento só seu.</em></h1><p>Cuidados, beleza e capricho em cada atendimento, em um studio preparado para receber você.</p><div class="actions"><button class="primary" onclick="openBooking()">Agendar horário</button><button class="secondary" onclick="document.querySelector('#servicos').scrollIntoView({behavior:'smooth'})">Conhecer serviços</button></div></div>
+<div class="hero-collage"><img src="images/debora-spa.jpeg" alt="Débora no studio"><img src="images/debora-studio.jpeg" alt="Débora no atendimento"><img src="images/debora-atendimento.jpeg" alt="Débora Nail Design"></div></section>
+<section class="strip"><div>♡ Atendimento com carinho</div><div>✦ Studio preparado para você</div><div>♡ Clube VIP Fidelidade</div></section>
+<section class="section" id="sobre"><div class="section-head"><span class="eyebrow">SOBRE MIM</span><h2>Um pouco da minha história</h2></div><div class="about"><div><p>Olá! Meu nome é Débora e trabalho na área de manicure e pedicure desde 2019.</p><p>Comecei atendendo com manicure e pedicure simples, indo até a casa das clientes. Com o tempo, busquei novos conhecimentos, fiz cursos e me especializei em unhas de gel.</p><p>Hoje tenho meu próprio studio, preparado para receber cada cliente com cuidado, capricho e atenção aos detalhes.</p><p>Meu objetivo é que cada atendimento seja mais do que um procedimento: seja um momento para você se cuidar, relaxar e sair se sentindo ainda mais linda. 💗</p></div><div class="quote">“Mais que unhas,<br><strong>um momento só seu.</strong>”</div></div></section>
+<section class="section pink" id="servicos"><div class="section-head"><span class="eyebrow">SERVIÇOS</span><h2>Escolha seu momento de beleza</h2><p>Veja os procedimentos disponíveis e escolha o que combina com você.</p></div><div id="servicesGrid" class="cards"></div></section>
+<section class="section" id="vip"><div class="section-head"><span class="eyebrow">VIP FIDELIDADE</span><h2>Seu carinho vira benefícios</h2></div><div class="vip-box"><div><div class="points">10 <small>pontos</small></div><h3>Complete sua cartela</h3><p>A cada visita/procedimento você ganha 1 ponto. Ao chegar a 10 pontos, você ganha <strong>60% de desconto</strong> em qualquer procedimento escolhido.</p></div><div class="rules"><p>✓ 2 procedimentos no mesmo dia = 1 ponto</p><p>✓ Faltou ou avisou em cima da hora = perde 1 ponto</p><p>✓ Ao usar o benefício, os pontos voltam para 0</p><p>✓ Depois de completar 10 pontos, você tem 45 dias para usar o benefício</p></div></div></section>
+<section class="section pink" id="galeria"><div class="section-head"><span class="eyebrow">GALERIA</span><h2>Alguns dos meus trabalhos</h2></div><div id="galleryGrid" class="gallery"></div></section>
+<section class="section" id="contato"><div class="section-head"><span class="eyebrow">CONTATO</span><h2>Vamos marcar seu horário?</h2></div><div class="contact-grid"><div class="contact-card"><h3>📍 Studio</h3><p>Rua Claudionor de Souza, 75 — Oratórios, MG</p><small>Na rua de baixo da antiga creche</small></div><div class="contact-card"><h3>🕘 Horário</h3><p>07h às 19h</p></div><div class="contact-card"><h3>💳 Pagamento</h3><p>Pix, dinheiro e cartão.</p><small>No cartão, há o acréscimo da máquina.</small></div></div><div class="contact-actions"><a class="primary link" href="https://wa.me/5531972084333" target="_blank">WhatsApp</a><a class="secondary link" href="https://www.instagram.com/perfectlynails02" target="_blank">Instagram @perfectlynails02</a></div></section>
+</main><footer><strong>Débora Aparecida Nail Design</strong><span>Mais que unhas, um momento só seu. ♡</span></footer>
+<div class="modal" id="modal"><div class="modal-box"><button class="close" onclick="closeModal()">×</button><div id="modalContent"></div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="config.js"></script><script src="app.js"></script>
+</body></html>

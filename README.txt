@@ -1,0 +1,1 @@
+Nova versão limpa do site. Não apagar o projeto antigo até esta versão ser testada. Preencher config.js com a URL e a Publishable Key do Supabase antes de usar recursos conectados.
