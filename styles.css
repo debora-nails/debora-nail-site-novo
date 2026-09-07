@@ -1265,3 +1265,197 @@ footer a{
   }
 
 }
+
+/* =====================================================
+   CARTÃO FIDELIDADE — ESTILO ROSE GOLD
+   ===================================================== */
+
+.loyalty-card{
+  position:relative;
+  background:
+    radial-gradient(circle at 90% 10%, rgba(188,112,91,.12), transparent 32%),
+    linear-gradient(145deg,#fffaf7 0%,#f9e9e3 48%,#fff8f5 100%);
+  border:1px solid #d5a395;
+  border-radius:24px;
+  padding:24px 22px 20px;
+  min-height:225px;
+  box-shadow:
+    0 12px 30px rgba(108,58,45,.13),
+    inset 0 0 25px rgba(255,255,255,.8);
+  overflow:hidden;
+}
+
+/* detalhes decorativos */
+
+.loyalty-card::before{
+  content:"";
+  position:absolute;
+  width:170px;
+  height:170px;
+  border:1px solid rgba(157,83,66,.13);
+  border-radius:50%;
+  right:-95px;
+  bottom:-95px;
+}
+
+.loyalty-card::after{
+  content:"♡";
+  position:absolute;
+  right:18px;
+  bottom:8px;
+  color:rgba(157,83,66,.16);
+  font-size:55px;
+  transform:rotate(-12deg);
+}
+
+.loyalty-heart{
+  position:absolute;
+  right:18px;
+  top:15px;
+  color:#9d5947;
+  font-size:25px;
+  z-index:2;
+}
+
+
+/* TÍTULO */
+
+.loyalty-card h3{
+  position:relative;
+  margin:0 38px 16px 0;
+  color:#794335;
+  font-family:"Playfair Display",serif;
+  font-size:17px;
+  line-height:1.12;
+  letter-spacing:.7px;
+  z-index:2;
+}
+
+
+/* 10 UNHAS */
+
+.loyalty-points{
+  position:relative;
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  justify-items:center;
+  gap:10px 8px;
+  margin:5px 0 17px;
+  z-index:2;
+}
+
+.loyalty-point{
+  position:relative;
+  width:30px;
+  height:42px;
+
+  /* formato de unha */
+  border:1.5px solid #ad6955;
+  border-radius:16px 16px 13px 13px;
+
+  background:
+    linear-gradient(
+      145deg,
+      #fffdfb 0%,
+      #f7ddd5 48%,
+      #eec7bb 100%
+    );
+
+  box-shadow:
+    inset 2px 2px 5px rgba(255,255,255,.95),
+    inset -2px -2px 4px rgba(165,91,72,.10),
+    0 3px 6px rgba(112,57,43,.10);
+
+  display:flex;
+  align-items:flex-end;
+  justify-content:center;
+
+  padding-bottom:5px;
+
+  color:#824737;
+  font-family:"Playfair Display",serif;
+  font-size:12px;
+  z-index:2;
+}
+
+
+/* brilho da unha */
+
+.loyalty-point::before{
+  content:"";
+  position:absolute;
+  top:4px;
+  left:5px;
+  width:14px;
+  height:8px;
+  border-radius:50%;
+  background:rgba(255,255,255,.72);
+}
+
+
+/* números */
+
+.loyalty-point:nth-child(1)::after{content:"1";}
+.loyalty-point:nth-child(2)::after{content:"2";}
+.loyalty-point:nth-child(3)::after{content:"3";}
+.loyalty-point:nth-child(4)::after{content:"4";}
+.loyalty-point:nth-child(5)::after{content:"5";}
+.loyalty-point:nth-child(6)::after{content:"6";}
+.loyalty-point:nth-child(7)::after{content:"7";}
+.loyalty-point:nth-child(8)::after{content:"8";}
+.loyalty-point:nth-child(9)::after{content:"9";}
+.loyalty-point:nth-child(10)::after{content:"10";}
+
+
+/* TEXTO DO PRÊMIO */
+
+.loyalty-card p{
+  position:relative;
+  margin:0;
+  padding:11px 0 0 31px;
+  border-top:1px solid #dfbcb1;
+  color:#70483e;
+  font-family:"Playfair Display",serif;
+  font-size:10.5px;
+  line-height:1.35;
+  z-index:2;
+}
+
+.loyalty-card p::before{
+  content:"🎁";
+  position:absolute;
+  left:1px;
+  top:10px;
+  font-size:18px;
+}
+
+
+/* DEIXA O CARTÃO MAIS DESTACADO */
+
+.vip-dashboard .loyalty-card{
+  transform:translateY(-2px);
+}
+
+.vip-dashboard .loyalty-card:hover{
+  transform:translateY(-4px);
+  box-shadow:
+    0 15px 35px rgba(108,58,45,.17),
+    inset 0 0 25px rgba(255,255,255,.8);
+}
+
+
+/* CELULAR */
+
+@media(max-width:600px){
+
+  .loyalty-card{
+    min-height:220px;
+    padding:22px 18px 18px;
+  }
+
+  .loyalty-point{
+    width:27px;
+    height:38px;
+  }
+
+}
