@@ -1549,6 +1549,50 @@ footer a{
     font-size: 15px;
   }
 
+ /* ===== AJUSTE DOS PREÇOS E AGENDAR ===== */
+
+.service-content .service-bottom {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-top: 18px !important;
+  gap: 15px !important;
+}
+
+.service-content .service-bottom strong {
+  color: #d65f7b !important;
+  font-family: "Playfair Display", serif !important;
+  font-size: 22px !important;
+  font-weight: 600 !important;
+}
+
+/* BOTÃO AGENDAR REDONDO */
+.service-content .service-bottom .primary.small {
+  width: 78px !important;
+  height: 78px !important;
+  min-width: 78px !important;
+  padding: 0 !important;
+
+  border-radius: 50% !important;
+  border: 2px solid #efb0bd !important;
+
+  background: #d65f7b !important;
+  color: #ffffff !important;
+
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  font-family: "Playfair Display", serif !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+
+  box-shadow: 0 5px 14px rgba(214, 95, 123, 0.22) !important;
+}
+
+.service-content .service-bottom .primary.small:hover {
+  transform: scale(1.04);
+} 
   .service-bottom strong {
     font-size: 22px;
   }
