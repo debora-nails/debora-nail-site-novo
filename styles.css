@@ -1,896 +1,115 @@
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@400;500;600&family=Allura&display=swap');
+/* ===== AJUSTES FINAIS ===== */
 
-:root{
-  --pink:#d63f69;
-  --pink2:#ef7190;
-  --rose:#fff0f2;
-  --cream:#fffaf7;
-  --ink:#2c2022;
-  --muted:#75666a;
-  --line:#ecd9dc;
-}
-
-*{
-  box-sizing:border-box;
-  margin:0;
-  padding:0;
-}
-
-html{
-  scroll-behavior:smooth;
-}
-
-body{
-  font-family:"DM Sans",sans-serif;
-  color:var(--ink);
-  background:var(--cream);
-  line-height:1.5;
-}
-
-a{
-  text-decoration:none;
-  color:inherit;
-}
-
-button,
-input,
-select{
-  font:inherit;
-}
-
-button{
-  cursor:pointer;
-}
-
-
-/* CABEÇALHO */
-
-.site-header{
-  height:82px;
-  background:#fffaf8;
-  display:flex;
-  align-items:center;
-  padding:0 4vw;
-  gap:30px;
-  border-bottom:1px solid #f0dedf;
-  position:sticky;
-  top:0;
-  z-index:20;
-}
-
-.logo{
-  position:relative;
-  color:#b86a75;
-  min-width:245px;
-  font-family:"Playfair Display",serif;
-  font-size:39px;
-  line-height:.8;
-}
-
-.logo span{
-  display:block;
-}
-
-.logo small{
-  display:block;
-  font:600 10px "DM Sans",sans-serif;
-  letter-spacing:5px;
-  text-align:center;
-  margin-top:10px;
-  color:#9d6b73;
-}
-
-.logo b{
-  position:absolute;
-  right:3px;
-  top:0;
-  font-size:26px;
-  font-weight:400;
-  color:#df7690;
-}
-
-nav{
-  display:flex;
-  align-items:center;
-  gap:28px;
-  margin-left:auto;
-  font-size:12px;
-  font-weight:600;
-}
-
-nav a{
-  padding:30px 0 22px;
-  border-bottom:2px solid transparent;
-}
-
-nav a.active,
-nav a:hover{
-  color:var(--pink);
-  border-color:var(--pink);
-}
-
-.vip-button{
-  border:0;
-  background:linear-gradient(135deg,#d23e67,#b92e55);
-  color:#fff;
-  border-radius:8px;
-  padding:12px 20px;
-  box-shadow:0 7px 18px #d63f692b;
-}
-
-.menu-btn{
-  display:none;
-  border:0;
-  background:none;
-  font-size:26px;
-}
-
-
-/* HERO */
-
-.hero{
-  min-height:565px;
-  display:grid;
-  grid-template-columns:43% 57%;
-  overflow:hidden;
-  background:linear-gradient(90deg,#f9e8e2,#f2d8d0);
-}
-
-.hero-copy{
-  padding:60px 7vw 45px 9vw;
-  position:relative;
-  z-index:2;
-}
-
-.welcome{
-  font:600 18px "Playfair Display",serif;
-  letter-spacing:6px;
-  color:#bb365c;
-  margin-bottom:2px;
-}
-
-.hero h1{
-  font:500 clamp(62px,6vw,84px) "Playfair Display",serif;
-  line-height:.95;
-  color:#cf3965;
-}
-
-.script{
-  font:76px "Allura",cursive;
-  line-height:1.1;
-  color:#171214;
-  margin:2px 0 10px;
-}
-
-.script span{
-  color:var(--pink);
-  font-size:44px;
-}
-
-.hero-copy>p{
-  font:21px "Playfair Display",serif;
-  line-height:1.25;
-  margin-bottom:25px;
-}
-
-.hero-button{
-  border:0;
-  background:linear-gradient(90deg,#d93d6b,#d64d76);
-  color:white;
-  border-radius:28px;
-  padding:14px 28px;
-  font-weight:700;
-  font-size:17px;
-  box-shadow:0 10px 25px #c93c5c3a;
-}
-
-.hero-benefits{
-  display:flex;
-  margin-top:27px;
-}
-
-.hero-benefits div{
-  min-width:120px;
-  padding:0 20px;
-  text-align:center;
-  border-right:1px solid #d4b5b1;
-}
-
-.hero-benefits div:first-child{
-  padding-left:0;
-}
-
-.hero-benefits div:last-child{
-  border:0;
-}
-
-.hero-benefits strong{
-  display:block;
-  font-size:30px;
-  font-weight:400;
-  margin-bottom:6px;
-}
-
-.hero-benefits span{
-  font:15px "Playfair Display",serif;
-  line-height:1.1;
-}
-
-
-/* FOTOS */
-
+/* Fotos do painel principal - separadas */
 .hero-collage{
-  position:relative;
+  display:grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap:18px;
+  align-items:center;
+  padding:35px 45px 35px 15px;
   min-height:565px;
 }
 
 .hero-collage img{
-  position:absolute;
+  position:relative !important;
+  left:auto !important;
+  right:auto !important;
+  top:auto !important;
+  bottom:auto !important;
+  width:100% !important;
+  height:390px !important;
   object-fit:cover;
-}
-
-.hero-collage img:nth-child(1){
-  width:47%;
-  height:78%;
-  left:0;
-  top:8%;
-  border-radius:160px 160px 0 0;
+  border-radius:90px 90px 18px 18px !important;
+  display:block;
 }
 
 .hero-collage img:nth-child(2){
-  width:54%;
-  height:58%;
-  left:29%;
-  bottom:0;
-  border-radius:130px 130px 0 0;
+  height:330px !important;
+  margin-top:70px;
 }
 
 .hero-collage img:nth-child(3){
-  width:45%;
-  height:70%;
-  right:0;
-  top:18%;
-  border-radius:145px 145px 0 0;
+  height:390px !important;
 }
 
 
-/* ÁREA VIP */
-
-.vip-dashboard{
-  display:grid;
-  grid-template-columns:1.15fr repeat(3,1fr);
-  gap:13px;
-  padding:28px 3.4vw;
-  background:#fff8f4;
-  align-items:stretch;
-}
-
-.vip-welcome{
-  padding:5px 22px;
-}
-
-.vip-welcome h2{
-  font:31px "Playfair Display",serif;
-  margin-bottom:7px;
-}
-
-.vip-welcome p{
-  font:16px "Playfair Display",serif;
-  line-height:1.3;
-  margin-bottom:14px;
-}
-
-.outline-button{
-  border:1px solid #d75b79;
-  color:#c63e61;
-  background:transparent;
-  border-radius:24px;
-  padding:9px 20px;
-}
-
-.vip-stat{
-  background:#fff;
-  border:1px solid #ecdfe0;
-  border-radius:15px;
-  box-shadow:0 4px 14px #8d596010;
-  text-align:center;
-  padding:16px 10px;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-}
-
-.vip-stat>span{
-  font:13px "Playfair Display",serif;
-}
-
-.vip-stat i{
-  font-style:normal;
-  font-size:35px;
-  color:#df5878;
-  background:#ffe5dd;
-  border-radius:50%;
-  width:68px;
-  height:68px;
-  display:grid;
-  place-items:center;
-  margin:7px;
-}
-
-.vip-stat strong{
-  font:22px "Playfair Display",serif;
-}
-
-.vip-stat button{
-  border:1px solid #eedbdb;
-  background:#fff5ef;
-  border-radius:20px;
-  padding:8px 17px;
-  margin-top:9px;
-  font-size:11px;
-}
-
-
-/* ATALHOS */
-
-.shortcuts{
-  display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:13px;
-  padding:0 3.4vw 25px;
-  background:#fff8f4;
-}
-
-.shortcuts article{
-  height:275px;
-  border-radius:14px;
-  overflow:hidden;
-  position:relative;
-  background:linear-gradient(135deg,#c98b91,#594449);
-  color:#fff;
-  padding:80px 18px 20px;
-  text-align:center;
-  cursor:pointer;
-}
-
-.shortcuts article:before{
-  content:"";
-  position:absolute;
-  inset:0;
-  background:#34222675;
-}
-
-.shortcuts article>*{
-  position:relative;
-  z-index:1;
-}
-
-.shortcut-icon{
-  margin:auto auto 15px;
-  background:#df4b70;
-  width:58px;
-  height:58px;
-  border-radius:50%;
-  display:grid;
-  place-items:center;
-  font-size:29px;
-}
-
-.shortcuts h3{
-  font:22px "Playfair Display",serif;
-  line-height:1.05;
-}
-
-.shortcuts p{
-  font:15px "Playfair Display",serif;
-  line-height:1.25;
-  margin-top:10px;
-}
-
-
-/* BENEFÍCIOS */
-
-.vip-benefits{
-  margin:0 3.4vw 25px;
-  padding:30px 45px;
-  background:#ffefec;
-  border-radius:12px;
-  display:grid;
-  grid-template-columns:1.5fr repeat(3,1fr);
-  align-items:center;
-}
-
-.benefits-copy h2{
-  font:34px "Playfair Display",serif;
-  line-height:1.05;
-}
-
-.benefits-copy p{
-  font:16px "Playfair Display",serif;
-  margin:8px 0 13px;
-}
-
-.benefits-copy button{
-  border:0;
-  background:#df4d70;
-  color:#fff;
-  border-radius:22px;
-  padding:12px 22px;
-}
-
-.benefit-item{
-  text-align:center;
-  border-left:1px solid #efd8d7;
-  padding:10px;
-}
-
-.benefit-item i{
-  display:grid;
-  place-items:center;
-  margin:auto auto 9px;
-  border:1px solid #ead5d3;
-  border-radius:50%;
-  width:65px;
-  height:65px;
-  color:#df5878;
-  font-style:normal;
-  font-size:29px;
-  background:#fff7f4;
-}
-
-.benefit-item span{
-  font:16px "Playfair Display",serif;
-  line-height:1.15;
-}
-
-
-/* SEÇÕES */
-
-.section{
-  padding:75px 6vw;
-}
-
-.section.soft{
-  background:#fff2f2;
-}
-
-.section-title{
-  text-align:center;
-  margin-bottom:35px;
-}
-
-.section-title small{
-  letter-spacing:4px;
-  color:#c13b5e;
-  font-weight:700;
-}
-
-.section-title h2{
-  font:500 43px "Playfair Display",serif;
-  margin:7px 0;
-}
-
-.section-title p{
-  color:var(--muted);
-}
-
-
-/* SOBRE */
-
-.about-grid{
-  max-width:1050px;
-  margin:auto;
-  display:grid;
-  grid-template-columns:360px 1fr;
-  gap:55px;
-  align-items:center;
-}
-
-.about-grid img{
-  width:100%;
-  height:430px;
-  object-fit:cover;
-  border-radius:25px;
-}
-
-.about-grid p{
-  margin-bottom:15px;
-  color:#5e5054;
-}
-
-
-/* SERVIÇOS */
+/* ===== FOTOS DOS SERVIÇOS ===== */
 
 .services-grid{
-  max-width:1150px;
-  margin:auto;
-  display:grid;
   grid-template-columns:repeat(3,1fr);
   gap:18px;
 }
 
 .service-card{
-  background:#fff;
-  border:1px solid var(--line);
-  border-radius:17px;
   overflow:hidden;
-  box-shadow:0 7px 25px #8c5c5c10;
 }
 
-.service-card>img{
+.service-images{
   width:100%;
-  height:200px;
-  object-fit:cover;
-}
-
-.service-body{
-  padding:19px;
-}
-
-.service-body small{
-  color:#c94665;
-}
-
-.service-body h3{
-  font:22px "Playfair Display",serif;
-  margin:5px 0;
-}
-
-.service-body p{
-  font-size:13px;
-  color:var(--muted);
-  min-height:58px;
-}
-
-.service-body>div{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-top:15px;
-}
-
-.service-body strong{
-  font-size:20px;
-  color:#c73e61;
-}
-
-.service-body button{
-  border:0;
-  background:#d9486c;
-  color:#fff;
-  border-radius:20px;
-  padding:9px 14px;
-}
-
-
-/* GALERIA */
-
-.gallery-grid{
-  max-width:1150px;
-  margin:auto;
+  height:155px;
   display:grid;
-  grid-template-columns:repeat(4,1fr);
-  gap:14px;
-}
-
-.gallery-grid figure{
-  margin:0;
-  border-radius:16px;
+  grid-template-columns:repeat(2,1fr);
+  gap:3px;
   overflow:hidden;
-  background:#eee;
 }
 
-.gallery-grid img{
+.service-images img{
   width:100%;
-  height:300px;
+  height:155px;
   object-fit:cover;
   display:block;
 }
 
-.gallery-grid figcaption{
-  padding:10px;
-  text-align:center;
-  font-size:12px;
+.service-images img:only-child{
+  grid-column:1 / -1;
+}
+
+
+/* ===== CARTÃO VIP FIDELIDADE ===== */
+
+.vip-dashboard{
+  grid-template-columns:1.15fr repeat(3,1fr) 1.15fr;
+}
+
+.loyalty-card{
   background:#fff;
+  border:1px solid #ecdfe0;
+  border-radius:15px;
+  box-shadow:0 4px 14px #8d596010;
+  padding:18px 15px;
+  min-height:190px;
 }
 
-
-/* CONTATO */
-
-.contact-section{
-  background:#fff2f2;
-}
-
-.contact-grid{
-  max-width:1100px;
-  margin:auto;
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:18px;
-}
-
-.contact-grid>div{
-  background:#fff;
-  border:1px solid var(--line);
-  border-radius:16px;
-  padding:25px;
-}
-
-.contact-grid b{
-  font:20px "Playfair Display",serif;
-}
-
-.contact-grid p{
-  margin-top:8px;
-}
-
-.contact-grid small{
-  color:var(--muted);
-}
-
-.contact-actions{
-  display:flex;
-  justify-content:center;
-  gap:12px;
-  margin-top:25px;
-}
-
-.contact-actions a{
-  background:#d9456a;
-  color:#fff;
-  border-radius:25px;
-  padding:12px 22px;
-  font-weight:700;
-  font-size:13px;
-}
-
-
-/* RODAPÉ */
-
-footer{
-  background:linear-gradient(90deg,#ef8198,#d94e73);
-  color:#fff;
-  padding:28px 5vw;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:15px;
-  font-family:"Playfair Display",serif;
-}
-
-.footer-logo{
-  font:38px "Allura",cursive;
-}
-
-footer a{
-  background:#c93660;
-  color:#fff;
-  border-radius:22px;
-  padding:10px 22px;
-  font-size:13px;
-}
-
-
-/* MODAL */
-
-.modal{
-  display:none;
-  position:fixed;
-  inset:0;
-  background:#29181d80;
-  z-index:50;
-  align-items:center;
-  justify-content:center;
-  padding:20px;
-}
-
-.modal.show{
-  display:flex;
-}
-
-.modal-box{
-  background:#fffaf7;
-  border-radius:20px;
-  padding:30px;
-  max-width:470px;
-  width:100%;
-  position:relative;
-}
-
-.modal-box h2{
-  font:32px "Playfair Display",serif;
+.loyalty-card h3{
+  color:#c63e61;
+  font:600 15px "Playfair Display",serif;
   margin-bottom:12px;
 }
 
-.modal-box p{
-  color:var(--muted);
-  margin-bottom:15px;
+.loyalty-heart{
+  float:right;
+  color:#df5878;
+  font-size:25px;
 }
 
-.modal-box label{
+.loyalty-points{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:8px;
+  margin:12px 0;
+}
+
+.loyalty-point{
+  width:25px;
+  height:25px;
+  border:1.5px solid #e89aaa;
+  border-radius:50%;
   display:block;
-  font-size:12px;
-  font-weight:700;
-  margin:10px 0;
 }
 
-.modal-box input,
-.modal-box select{
-  width:100%;
-  padding:11px;
-  border:1px solid var(--line);
-  border-radius:10px;
-  margin-top:5px;
-}
-
-.close{
-  position:absolute;
-  right:15px;
-  top:10px;
-  border:0;
-  background:none;
-  font-size:28px;
-}
-
-.modal-primary{
-  border:0;
-  background:#d94369;
-  color:#fff;
-  border-radius:22px;
-  padding:12px 20px;
-  width:100%;
-  margin-top:12px;
-}
-
-
-/* CELULAR */
-
-@media(max-width:950px){
-
-  .site-header{
-    height:70px;
-  }
-
-  .logo{
-    font-size:29px;
-    min-width:180px;
-  }
-
-  nav{
-    gap:13px;
-    font-size:10px;
-  }
-
-  .hero{
-    grid-template-columns:1fr;
-  }
-
-  .hero-copy{
-    padding:45px 8vw;
-  }
-
-  .hero-collage{
-    min-height:480px;
-  }
-
-  .vip-dashboard{
-    grid-template-columns:1fr 1fr;
-  }
-
-  .vip-welcome{
-    grid-column:1/-1;
-  }
-
-  .shortcuts{
-    grid-template-columns:1fr 1fr;
-  }
-
-  .vip-benefits{
-    grid-template-columns:1fr 1fr;
-  }
-
-  .benefits-copy{
-    grid-column:1/-1;
-    margin-bottom:15px;
-  }
-
-  .gallery-grid{
-    grid-template-columns:repeat(2,1fr);
-  }
-
-  .services-grid{
-    grid-template-columns:1fr 1fr;
-  }
-}
-
-
-@media(max-width:650px){
-
-  .menu-btn{
-    display:block;
-    margin-left:auto;
-  }
-
-  .site-header nav{
-    display:none;
-    position:absolute;
-    top:70px;
-    left:0;
-    right:0;
-    background:#fff;
-    padding:15px 25px;
-    flex-direction:column;
-    align-items:stretch;
-  }
-
-  .site-header nav.open{
-    display:flex;
-  }
-
-  .site-header nav a{
-    padding:10px;
-  }
-
-  .hero h1{
-    font-size:57px;
-  }
-
-  .script{
-    font-size:60px;
-  }
-
-  .hero-benefits{
-    gap:3px;
-  }
-
-  .hero-benefits div{
-    min-width:0;
-    padding:0 8px;
-  }
-
-  .hero-benefits span{
-    font-size:12px;
-  }
-
-  .hero-collage{
-    min-height:400px;
-  }
-
-  .vip-dashboard,
-  .shortcuts,
-  .vip-benefits,
-  .services-grid,
-  .contact-grid{
-    grid-template-columns:1fr;
-  }
-
-  .vip-welcome{
-    grid-column:auto;
-  }
-
-  .benefit-item{
-    border-left:0;
-    border-top:1px solid #efd8d7;
-  }
-
-  .about-grid{
-    grid-template-columns:1fr;
-  }
-
-  .gallery-grid{
-    grid-template-columns:1fr 1fr;
-  }
-
-  .gallery-grid img{
-    height:220px;
-  }
-
-  .contact-actions,
-  footer{
-    flex-direction:column;
-  }
-
-  .section{
-    padding:55px 20px;
-  }
+.loyalty-card p{
+  font:12px "Playfair Display",serif;
+  line-height:1.3;
+  color:#5e5054;
+  margin-top:10px;
 }
