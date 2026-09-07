@@ -1498,3 +1498,305 @@ footer a{
   font-size: 14px !important;
   min-width: 92px;
 }
+
+/* =========================================================
+   NOVO VISUAL DOS SERVIÇOS — DÉBORA NAIL
+   ========================================================= */
+
+/* Seção de serviços */
+#servicos {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    180deg,
+    #fff1f5 0%,
+    #fff8fa 55%,
+    #fff1f5 100%
+  );
+}
+
+/* Frase decorativa do lado esquerdo */
+#servicos::before {
+  content: "BELEZA\A CUIDADO\A CONFIANÇA\A SEMPRE COM VOCÊ";
+  white-space: pre;
+  position: absolute;
+  left: 3%;
+  top: 105px;
+  font-family: Arial, sans-serif;
+  font-size: 11px;
+  line-height: 1.8;
+  letter-spacing: 2.5px;
+  font-weight: 600;
+  color: #a95f78;
+  text-align: left;
+}
+
+/* Frase decorativa do lado direito */
+#servicos::after {
+  content: "Mais que unhas,\A autoestima também ✧";
+  white-space: pre;
+  position: absolute;
+  right: 3%;
+  top: 85px;
+  font-family: Georgia, serif;
+  font-size: 24px;
+  line-height: 1.25;
+  font-style: italic;
+  color: #dda0b3;
+  text-align: center;
+  transform: rotate(-5deg);
+  opacity: 0.85;
+}
+
+/* Título da seção */
+#servicos .section-head {
+  position: relative;
+  z-index: 2;
+  max-width: 850px;
+  margin-bottom: 42px;
+}
+
+#servicos .section-head .eyebrow {
+  color: #a75b75;
+  letter-spacing: 4px;
+  font-size: 11px;
+}
+
+#servicos .section-head h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(36px, 4vw, 52px);
+  font-weight: 400;
+  color: #5b3b48;
+  margin: 12px 0 10px;
+}
+
+#servicos .section-head h2::after {
+  content: "♡";
+  display: block;
+  color: #d87898;
+  font-family: Georgia, serif;
+  font-size: 22px;
+  margin-top: 8px;
+}
+
+#servicos .section-head p {
+  color: #806a72;
+  font-size: 15px;
+}
+
+/* Grade dos serviços */
+#servicos .cards {
+  position: relative;
+  z-index: 3;
+  max-width: 1200px;
+  gap: 20px;
+}
+
+/* Cartão */
+#servicos .service-card {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid #efd2dc;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 8px 25px rgba(126, 70, 91, 0.08);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+#servicos .service-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 32px rgba(126, 70, 91, 0.13);
+}
+
+/* REMOVE 01, 02, 03, 04... */
+#servicos .service-number {
+  display: none !important;
+}
+
+/* Fotos */
+#servicos .service-images {
+  padding: 0;
+  gap: 3px;
+  background: #fff;
+}
+
+#servicos .service-images img {
+  height: 155px;
+  border-radius: 0;
+  object-fit: cover;
+}
+
+/* Conteúdo */
+#servicos .service-content {
+  padding: 18px 18px 16px;
+}
+
+/* Nome do procedimento */
+#servicos .service-card h3 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 21px;
+  font-weight: 500;
+  color: #553743;
+  margin: 0 0 7px;
+}
+
+/* Pequeno detalhe ao lado do nome */
+#servicos .service-card h3::after {
+  content: "  ♡";
+  color: #d97898;
+  font-size: 16px;
+}
+
+/* Descrição */
+#servicos .service-card p {
+  color: #77666d;
+  font-size: 13.5px;
+  line-height: 1.55;
+  min-height: 62px;
+  margin: 0;
+}
+
+/* Parte do preço + botão */
+#servicos .price {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+/* PREÇO DENTRO DO CÍRCULO/OVAL ROSA */
+#servicos .price span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 125px;
+  height: 45px;
+  padding: 0 17px;
+  border-radius: 999px;
+  background: #f9ccd9;
+  color: #c43f67;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 21px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.35);
+}
+
+/* Texto pequeno que fica dentro do price, se existir */
+#servicos .price small {
+  display: none;
+}
+
+/* BOTÃO AGENDAR ROSA */
+#servicos .service-book {
+  flex-shrink: 0;
+  min-width: 125px;
+  height: 45px;
+  padding: 0 18px;
+  border: none !important;
+  border-radius: 10px !important;
+  background: linear-gradient(
+    135deg,
+    #c95777,
+    #b94163
+  ) !important;
+  color: #fff !important;
+  font-family: Arial, sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: .2px;
+  cursor: pointer;
+  box-shadow: 0 5px 12px rgba(185, 65, 99, 0.18);
+  transition: all .2s ease;
+}
+
+/* Ícone delicado antes de Agendar */
+#servicos .service-book::before {
+  content: "♡";
+  margin-right: 7px;
+  font-size: 15px;
+}
+
+/* Efeito ao passar o mouse */
+#servicos .service-book:hover {
+  background: #a93659 !important;
+  transform: translateY(-1px);
+  box-shadow: 0 7px 16px rgba(185, 65, 99, 0.25);
+}
+
+/* =========================================================
+   FAIXA DELICADA ABAIXO DOS SERVIÇOS
+   ========================================================= */
+
+#servicos::marker {
+  display: none;
+}
+
+/* =========================================================
+   CELULAR
+   ========================================================= */
+
+@media (max-width: 1100px) {
+
+  #servicos::before {
+    left: 1.5%;
+    font-size: 9px;
+  }
+
+  #servicos::after {
+    right: 1.5%;
+    font-size: 18px;
+  }
+
+}
+
+@media (max-width: 900px) {
+
+  #servicos::before,
+  #servicos::after {
+    display: none;
+  }
+
+  #servicos .cards {
+    gap: 18px;
+  }
+
+}
+
+@media (max-width: 560px) {
+
+  #servicos .section-head h2 {
+    font-size: 34px;
+  }
+
+  #servicos .service-images img {
+    height: 145px;
+  }
+
+  #servicos .service-content {
+    padding: 16px;
+  }
+
+  #servicos .service-card h3 {
+    font-size: 20px;
+  }
+
+  #servicos .price {
+    align-items: center;
+  }
+
+  #servicos .price span {
+    min-width: 105px;
+    height: 42px;
+    font-size: 18px;
+    padding: 0 12px;
+  }
+
+  #servicos .service-book {
+    min-width: 108px;
+    height: 42px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+
+}
