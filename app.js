@@ -98,11 +98,14 @@ const SERVICES = [
   ],
 
   [
-    "Spa dos Pés",
+  
+   ["Spa dos Pés",
     50,
     "Cuidado e relaxamento para os pés, com pedicure incluso.",
     [
-      "imagens/spa-pes-novo.jpeg"
+      "imagens/spa-pes-novo.jpeg",
+      "imagens/spa-pes-2.jpeg"]] 
+      
     ],
     []
   ],
