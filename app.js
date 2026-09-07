@@ -357,7 +357,7 @@ document
   // Procura o cadastro da cliente
   let { data: cliente, error: clienteError } = await client
     .from("Clientes")
-    .select('id, "Nome", whatsapp, email')
+    .select('id, "nome", whatsapp, email')
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -375,12 +375,12 @@ document
     const { data: novoCliente, error: novoClienteError } = await client
       .from("Clientes")
       .insert({
-        Nome: nome,
+        nome: nome,
         whatsapp: "",
         email: email,
         user_id: user.id
       })
-      .select('id, "Nome", whatsapp, email')
+      .select('id, "nome", whatsapp, email')
       .single();
 
     if (novoClienteError) {
