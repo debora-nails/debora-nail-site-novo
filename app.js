@@ -557,3 +557,55 @@ document
 
 renderServices();
 renderGallery();
+// ===== ÁREA DA DÉBORA =====
+
+window.abrirAreaDebora = function () {
+  const area = document.getElementById("areaDebora");
+
+  if (area) {
+    area.style.display = "block";
+    area.scrollIntoView({
+      behavior: "smooth"
+    });
+  }
+};
+
+window.abrirAdminAba = function (aba) {
+  const conteudo = document.getElementById("adminConteudo");
+
+  if (!conteudo) return;
+
+  const titulos = {
+    horarios: "📅 Horários",
+    precos: "💰 Preços",
+    fotos: "📸 Fotos",
+    promocoes: "🎀 Promoções",
+    vip: "⭐ VIP Fidelidade",
+    agendamentos: "📋 Agendamentos"
+  };
+
+  conteudo.innerHTML = `
+    <div class="admin-boas-vindas">
+      <span>♡</span>
+      <h3>${titulos[aba] || "Área da Débora"}</h3>
+      <p>Esta área será configurada no próximo passo.</p>
+    </div>
+  `;
+};
+
+window.sairAdmin = async function () {
+  const client = window.supabase.createClient(
+    window.SUPABASE_CONFIG.url,
+    window.SUPABASE_CONFIG.publishableKey
+  );
+
+  await client.auth.signOut();
+
+  const area = document.getElementById("areaDebora");
+
+  if (area) {
+    area.style.display = "none";
+  }
+
+  alert("Você saiu da Área da Débora.");
+};
