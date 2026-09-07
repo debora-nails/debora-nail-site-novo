@@ -1,33 +1,27 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Débora Nail — Clube VIP</title>
-
-  <meta
-    name="description"
-    content="Débora Nail Design — unhas, cuidados, agendamento e Clube VIP."
-  >
-
+  <meta name="description" content="Clube VIP Débora Nail — Mais que unhas, um momento só seu.">
   <link rel="stylesheet" href="styles.css">
 </head>
 
 <body>
 
-<header class="header">
+<header class="site-header">
 
-  <div class="logo">
-    <span>Débora Nail ♡</span>
+  <a class="logo" href="#inicio">
+    <span>Débora Nail</span>
     <small>CLUBE VIP</small>
-  </div>
+    <b>♧</b>
+  </a>
 
   <button class="menu-btn" id="menuBtn">☰</button>
 
   <nav id="nav">
-
-    <a href="#inicio">INÍCIO</a>
+    <a class="active" href="#inicio">INÍCIO</a>
     <a href="#sobre">SOBRE</a>
     <a href="#servicos">SERVIÇOS</a>
     <a href="#vantagens">VANTAGENS</a>
@@ -35,9 +29,8 @@
     <a href="#contato">CONTATO</a>
 
     <button class="vip-button" id="loginBtn">
-      🔒 ÁREA VIP
+      ♙ &nbsp; ÁREA VIP
     </button>
-
   </nav>
 
 </header>
@@ -45,45 +38,42 @@
 
 <main>
 
-<!-- INÍCIO -->
-
 <section class="hero" id="inicio">
 
-  <div class="hero-content">
+  <div class="hero-copy">
 
-    <p class="eyebrow">BEM-VINDA AO</p>
+    <div class="welcome">BEM-VINDA AO</div>
 
-    <h1>
-      Clube VIP
-      <em>Débora Nail ♡</em>
-    </h1>
+    <h1>Clube VIP</h1>
 
-    <p class="hero-text">
-      Um espaço exclusivo para quem ama cuidar
-      das unhas e aproveitar benefícios especiais.
+    <div class="script">
+      Débora Nail <span>♡</span>
+    </div>
+
+    <p>
+      Um espaço exclusivo para<br>
+      quem ama cuidar das unhas.
     </p>
 
-    <button
-      class="main-button"
-      onclick="openVip()">
-      ♕ ENTRAR NA ÁREA VIP
+    <button class="hero-button" onclick="openBooking()">
+      ♕ &nbsp; ENTRAR NA ÁREA VIP
     </button>
 
     <div class="hero-benefits">
 
       <div>
-        <span>♢</span>
-        <strong>Benefícios<br>exclusivos</strong>
+        <strong>♢</strong>
+        <span>Benefícios<br>exclusivos</span>
       </div>
 
       <div>
-        <span>▦</span>
-        <strong>Agendamento<br>prático</strong>
+        <strong>▦</strong>
+        <span>Agendamento<br>prático</span>
       </div>
 
       <div>
-        <span>♡</span>
-        <strong>Atendimento<br>especial</strong>
+        <strong>♡</strong>
+        <span>Atendimento<br>especial</span>
       </div>
 
     </div>
@@ -91,454 +81,231 @@
   </div>
 
 
-  <div class="hero-photo">
+  <div class="hero-collage">
 
-    <img
-      src="imagens/debora-spa.jpeg"
-      alt="Débora Nail">
+    <img src="imagens/debora-spa.jpeg" alt="Débora Nail">
 
-    <img
-      src="imagens/debora-studio.jpeg"
-      alt="Débora Nail">
+    <img src="imagens/debora-studio.jpeg" alt="Débora no studio">
 
-    <img
-      src="imagens/debora-atendimento.jpeg"
-      alt="Débora Nail">
+    <img src="imagens/debora-atendimento.jpeg" alt="Débora no atendimento">
 
   </div>
 
 </section>
 
 
-<!-- ÁREA VIP -->
+<section class="vip-dashboard" id="vip">
 
-<section class="vip-dashboard">
+  <div class="vip-welcome">
 
-  <div class="vip-intro">
-
-    <p class="eyebrow">CLUBE VIP DÉBORA NAIL</p>
-
-    <h2>
-      Olá, Cliente VIP! 💗
-    </h2>
+    <h2>Olá, Cliente VIP! 💝</h2>
 
     <p>
-      Aqui você tem acesso a um mundo de vantagens
-      pensado especialmente para você.
+      Aqui você tem acesso a um mundo<br>
+      de vantagens feitas especialmente<br>
+      para você.
     </p>
 
-    <button
-      class="outline-button"
-      onclick="openVip()">
-      ♙ MEUS DADOS
+    <button class="outline-button" id="dataBtn">
+      ♙ &nbsp; MEUS DADOS
     </button>
 
   </div>
 
 
-  <div class="vip-card">
-
+  <div class="vip-stat">
     <span>SEU NÍVEL</span>
-
-    <div class="vip-icon">♕</div>
-
-    <strong id="vipLevel">
-      CLIENTE VIP
-    </strong>
-
-    <button onclick="showBenefits()">
-      VER BENEFÍCIOS
-    </button>
-
+    <i>♕</i>
+    <strong>DIAMANTE</strong>
+    <button>VER BENEFÍCIOS</button>
   </div>
 
 
-  <div class="vip-card">
-
+  <div class="vip-stat">
     <span>PONTOS ACUMULADOS</span>
+    <i>☆</i>
+    <strong>0 pts</strong>
+    <button>VER HISTÓRICO</button>
+  </div>
 
-    <div class="vip-icon">☆</div>
 
-    <strong id="vipPoints">
-      0 pts
-    </strong>
+  <div class="vip-stat">
+    <span>PROMOÇÕES</span>
+    <i>♢</i>
+    <strong>0</strong>
+    <button>VER PROMOÇÕES</button>
+  </div>
 
-    <button onclick="showHistory()">
-      VER HISTÓRICO
+</section>
+
+
+<section class="shortcuts">
+
+  <article onclick="openBooking()">
+    <div class="shortcut-icon">▦</div>
+    <h3>AGENDAR<br>ATENDIMENTO</h3>
+    <p>Escolha o melhor<br>horário para você.</p>
+  </article>
+
+  <article>
+    <div class="shortcut-icon">♡</div>
+    <h3>MEUS<br>ATENDIMENTOS</h3>
+    <p>Veja seu histórico<br>de atendimentos.</p>
+  </article>
+
+  <article>
+    <div class="shortcut-icon">♢</div>
+    <h3>VANTAGENS<br>EXCLUSIVAS</h3>
+    <p>Descontos e benefícios<br>só para VIPs.</p>
+  </article>
+
+  <article>
+    <div class="shortcut-icon">♧</div>
+    <h3>AVISOS E<br>NOVIDADES</h3>
+    <p>Fique por dentro de tudo<br>em primeira mão.</p>
+  </article>
+
+</section>
+
+
+<section class="vip-benefits" id="vantagens">
+
+  <div class="benefits-copy">
+
+    <h2>Ser VIP é ter<br>cuidados e privilégios</h2>
+
+    <p>Aqui você se sente única e especial!</p>
+
+    <button onclick="document.querySelector('#vip').scrollIntoView({behavior:'smooth'})">
+      VER TODOS OS BENEFÍCIOS &nbsp; ♢
     </button>
 
   </div>
 
+  <div class="benefit-item">
+    <i>♢</i>
+    <span>Descontos<br>Especiais</span>
+  </div>
 
-  <div class="vip-card">
+  <div class="benefit-item">
+    <i>▦</i>
+    <span>Prioridade no<br>Agendamento</span>
+  </div>
 
-    <span>BENEFÍCIO DISPONÍVEL</span>
-
-    <div class="vip-icon">🎁</div>
-
-    <strong id="vipBenefit">
-      0
-    </strong>
-
-    <button onclick="showBenefits()">
-      VER BENEFÍCIO
-    </button>
-
+  <div class="benefit-item">
+    <i>♙</i>
+    <span>Atendimento<br>Personalizado</span>
   </div>
 
 </section>
 
 
-<!-- ATALHOS -->
+<section class="section" id="sobre">
 
-<section class="shortcut-grid">
+  <div class="section-title">
+    <small>SOBRE</small>
+    <h2>Um pouco da minha história</h2>
+  </div>
 
-  <button
-    class="shortcut"
-    onclick="openBooking()">
+  <div class="about-grid">
 
-    <div class="shortcut-image">
-      <img src="imagens/debora-studio.jpeg" alt="">
-    </div>
+    <img src="imagens/debora-studio.jpeg" alt="Débora Nail no studio">
 
     <div>
 
-      <span class="shortcut-icon">▦</span>
-
-      <h3>
-        AGENDAR<br>
-        ATENDIMENTO
-      </h3>
+      <p>
+        Olá! Meu nome é Débora e trabalho na área de manicure e pedicure desde 2019.
+      </p>
 
       <p>
-        Escolha o melhor horário para você.
+        Comecei atendendo com manicure e pedicure simples, indo até a casa das clientes.
+        Com o tempo, busquei novos conhecimentos, fiz cursos e me especializei em unhas de gel.
+      </p>
+
+      <p>
+        Hoje tenho meu próprio studio, preparado para receber cada cliente com cuidado,
+        capricho e atenção aos detalhes.
+      </p>
+
+      <p>
+        Meu objetivo é que cada atendimento seja mais do que um procedimento:
+        seja um momento para você se cuidar, relaxar e sair se sentindo ainda mais linda. 💗
       </p>
 
     </div>
 
-  </button>
+  </div>
+
+</section>
 
 
-  <button
-    class="shortcut"
-    onclick="showHistory()">
+<section class="section soft" id="servicos">
 
-    <div class="shortcut-image">
-      <img src="imagens/fibra-1.jpeg" alt="">
+  <div class="section-title">
+
+    <small>SERVIÇOS</small>
+
+    <h2>Escolha seu momento de beleza</h2>
+
+    <p>
+      Veja os procedimentos disponíveis e escolha o que combina com você.
+    </p>
+
+  </div>
+
+  <div id="servicesGrid" class="services-grid"></div>
+
+</section>
+
+
+<section class="section" id="galeria">
+
+  <div class="section-title">
+    <small>GALERIA</small>
+    <h2>Alguns dos meus trabalhos</h2>
+  </div>
+
+  <div id="galleryGrid" class="gallery-grid"></div>
+
+</section>
+
+
+<section class="section contact-section" id="contato">
+
+  <div class="section-title">
+    <small>CONTATO</small>
+    <h2>Vamos marcar seu horário?</h2>
+  </div>
+
+  <div class="contact-grid">
+
+    <div>
+      <b>📍 Studio</b>
+      <p>Rua Claudionor de Souza, 75 — Oratórios, MG</p>
+      <small>Na rua de baixo da antiga creche</small>
     </div>
 
     <div>
-
-      <span class="shortcut-icon">♡</span>
-
-      <h3>
-        MEUS<br>
-        ATENDIMENTOS
-      </h3>
-
-      <p>
-        Veja seu histórico de atendimentos.
-      </p>
-
-    </div>
-
-  </button>
-
-
-  <button
-    class="shortcut"
-    onclick="showBenefits()">
-
-    <div class="shortcut-image">
-      <img src="imagens/soft-gel-1.jpeg" alt="">
+      <b>🕘 Horário</b>
+      <p>07h às 19h</p>
     </div>
 
     <div>
-
-      <span class="shortcut-icon">🎁</span>
-
-      <h3>
-        VANTAGENS<br>
-        EXCLUSIVAS
-      </h3>
-
-      <p>
-        Descontos e benefícios só para VIPs.
-      </p>
-
+      <b>💳 Pagamento</b>
+      <p>Pix, dinheiro e cartão.</p>
+      <small>No cartão, há o acréscimo da máquina.</small>
     </div>
 
-  </button>
-
-
-  <button
-    class="shortcut"
-    onclick="showNews()">
-
-    <div class="shortcut-image">
-      <img src="imagens/plastica-pes-1.jpeg" alt="">
-    </div>
-
-    <div>
-
-      <span class="shortcut-icon">♧</span>
-
-      <h3>
-        AVISOS E<br>
-        NOVIDADES
-      </h3>
-
-      <p>
-        Fique por dentro das novidades.
-      </p>
-
-    </div>
-
-  </button>
-
-</section>
-
-
-<!-- VANTAGENS -->
-
-<section class="benefits-section" id="vantagens">
-
-  <div class="benefits-title">
-
-    <p class="eyebrow">
-      CLUBE VIP DÉBORA NAIL
-    </p>
-
-    <h2>
-      Ser VIP é ter<br>
-      cuidados e privilégios
-    </h2>
-
-    <p>
-      Aqui você se sente única e especial!
-    </p>
-
-    <button
-      class="main-button"
-      onclick="showBenefits()">
-      VER TODOS OS BENEFÍCIOS ♢
-    </button>
-
   </div>
-
-
-  <div class="benefit-item">
-
-    <span>🎟</span>
-
-    <strong>
-      Descontos<br>
-      Especiais
-    </strong>
-
-  </div>
-
-
-  <div class="benefit-item">
-
-    <span>▦</span>
-
-    <strong>
-      Prioridade no<br>
-      Agendamento
-    </strong>
-
-  </div>
-
-
-  <div class="benefit-item">
-
-    <span>🎁</span>
-
-    <strong>
-      Brindes<br>
-      Exclusivos
-    </strong>
-
-  </div>
-
-
-  <div class="benefit-item">
-
-    <span>♙</span>
-
-    <strong>
-      Atendimento<br>
-      Personalizado
-    </strong>
-
-  </div>
-
-</section>
-
-
-<!-- SOBRE MIM -->
-
-<section class="about-section" id="sobre">
-
-  <div class="about-image">
-
-    <img
-      src="imagens/debora-spa.jpeg"
-      alt="Débora Aparecida Nail Design">
-
-  </div>
-
-
-  <div class="about-content">
-
-    <p class="eyebrow">
-      UM POUCO DA MINHA HISTÓRIA
-    </p>
-
-    <h2>
-      Muito mais que unhas,<br>
-      um momento só seu.
-    </h2>
-
-    <p>
-      Olá! Meu nome é Débora e trabalho na área
-      de manicure e pedicure desde 2019.
-    </p>
-
-    <p>
-      Comecei atendendo com manicure e pedicure
-      simples, indo até a casa das clientes.
-      Com o tempo, busquei novos conhecimentos,
-      fiz cursos e me especializei em unhas de gel.
-    </p>
-
-    <p>
-      Hoje tenho meu próprio studio, preparado para
-      receber cada cliente com cuidado, capricho
-      e atenção aos detalhes.
-    </p>
-
-    <p>
-      Meu objetivo é que cada atendimento seja mais
-      do que um procedimento: seja um momento para
-      você se cuidar, relaxar e sair se sentindo
-      ainda mais linda. 💗
-    </p>
-
-  </div>
-
-</section>
-
-
-<!-- SERVIÇOS -->
-
-<section class="services-section" id="servicos">
-
-  <div class="section-heading">
-
-    <p class="eyebrow">
-      CUIDADOS PARA VOCÊ
-    </p>
-
-    <h2>
-      Nossos Serviços
-    </h2>
-
-    <p>
-      Escolha seu procedimento e venha viver
-      um momento especial.
-    </p>
-
-  </div>
-
-
-  <div
-    class="services-grid"
-    id="servicesGrid">
-  </div>
-
-</section>
-
-
-<!-- GALERIA -->
-
-<section class="gallery-section" id="galeria">
-
-  <div class="section-heading">
-
-    <p class="eyebrow">
-      INSPIRAÇÕES
-    </p>
-
-    <h2>
-      Galeria Débora Nail
-    </h2>
-
-    <p>
-      Alguns dos trabalhos realizados no studio.
-    </p>
-
-  </div>
-
-
-  <div
-    class="gallery-grid"
-    id="galleryGrid">
-  </div>
-
-</section>
-
-
-<!-- CONTATO -->
-
-<section class="contact-section" id="contato">
-
-  <div>
-
-    <p class="eyebrow">
-      VAMOS MARCAR SEU HORÁRIO?
-    </p>
-
-    <h2>
-      Será um prazer<br>
-      receber você. 💗
-    </h2>
-
-    <p>
-      Rua Claudionor de Souza, 75<br>
-      Oratórios — MG
-    </p>
-
-    <p>
-      Na rua de baixo da antiga creche.
-    </p>
-
-  </div>
-
 
   <div class="contact-actions">
 
-    <button
-      class="main-button"
-      onclick="openBooking()">
-      ▦ AGENDAR HORÁRIO
-    </button>
-
-
-    <a
-      class="whatsapp-button"
-      href="https://wa.me/5531972084333"
-      target="_blank">
-      ☎ FALAR NO WHATSAPP
+    <a href="https://wa.me/5531972084333" target="_blank">
+      ◉ &nbsp; FALAR NO WHATSAPP
     </a>
 
-
-    <a
-      class="instagram-button"
-      href="https://www.instagram.com/perfectlynails02"
-      target="_blank">
-      ◎ @perfectlynails02
+    <a href="https://www.instagram.com/perfectlynails02" target="_blank">
+      INSTAGRAM @perfectlynails02
     </a>
 
   </div>
@@ -550,40 +317,28 @@
 
 <footer>
 
-  <strong>
-    Débora Nail ♡
-  </strong>
+  <div class="footer-logo">
+    ♡ Débora Nail
+  </div>
 
-  <span>
-    NAIL DESIGN
-  </span>
+  <div>
+    Muito mais que unhas, é sobre autoestima!
+  </div>
 
-  <p>
-    Mais que unhas, um momento só seu.
-  </p>
-
-  <small>
-    © 2026 Débora Aparecida Nail Design
-  </small>
+  <a href="https://wa.me/5531972084333" target="_blank">
+    ◉ &nbsp; FALAR NO WHATSAPP
+  </a>
 
 </footer>
 
 
-<!-- JANELA / MODAL -->
+<div class="modal" id="modal">
 
-<div
-  class="modal"
-  id="modal">
+  <div class="modal-box">
 
-  <div
-    class="modal-box"
-    id="modalContent">
+    <button class="close" onclick="closeModal()">×</button>
 
-    <button
-      class="close-modal"
-      onclick="closeModal()">
-      ×
-    </button>
+    <div id="modalContent"></div>
 
   </div>
 
