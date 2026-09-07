@@ -1,340 +1,598 @@
-const SERVICES = [
-  [
-    "Alongamento Mold F1",
-    135,
-    "Alongamento construído com molde F1, estrutura personalizada e acabamento elegante.",
-    ["imagens/mold-f1-1.jpeg", "imagens/mold-f1-2.jpeg"]
-  ],
-  [
-    "Alongamento Fibra de Vidro",
-    140,
-    "Alongamento com fibra de vidro, resultado delicado, estruturado e personalizado.",
-    ["imagens/fibra-1.jpeg", "imagens/fibra-2.jpeg"]
-  ],
-  [
-    "Banho de Gel",
-    80,
-    "Aplicação de gel sobre a unha natural para reforçar estrutura e acabamento.",
-    ["imagens/banho-gel-1.jpeg", "imagens/banho-gel-2.jpeg"]
-  ],
-  [
-    "Postiça Realista",
-    35,
-    "Visual natural e acabamento delicado, uma opção prática para suas unhas.",
-    [
-      "imagens/postica-1.jpeg",
-      "imagens/postica-2.jpeg",
-      "imagens/postica-3.jpeg"
-    ]
-  ],
-  [
-    "Soft Gel",
-    40,
-    "Alongamento com tips de gel, leve, uniforme e elegante.",
-    ["imagens/soft-gel-1.jpeg", "imagens/soft-gel-2.jpeg"]
-  ],
-  [
-    "Manicure",
-    24,
-    "Cuidado das unhas das mãos, preparação, acabamento e esmaltação conforme escolha.",
-    []
-  ],
-  [
-    "Pedicure",
-    24,
-    "Cuidado das unhas dos pés, preparação, acabamento e esmaltação conforme escolha.",
-    ["imagens/pedicure-1.jpeg"]
-  ],
-  [
-    "Spa dos Pés",
-    50,
-    "Cuidado e relaxamento para os pés, com pedicure incluso.",
-    []
-  ],
-  [
-    "Plástica dos Pés",
-    65,
-    "Cuidado especial para melhorar a aparência e a sensação de maciez dos pés.",
-    ["imagens/plastica-pes-1.jpeg", "imagens/plastica-pes-2.jpeg"]
-  ]
-];
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-const grid = document.getElementById("servicesGrid");
-const galleryGrid = document.getElementById("galleryGrid");
+  <title>Débora Nail — Clube VIP</title>
 
-const money = value =>
-  value.toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL"
-  });
+  <meta
+    name="description"
+    content="Débora Nail Design — unhas, cuidados, agendamento e Clube VIP."
+  >
 
+  <link rel="stylesheet" href="styles.css">
+</head>
 
-function renderServices() {
-  if (!grid) return;
+<body>
 
-  grid.innerHTML = SERVICES.map((service, index) => `
-    <article class="service-card">
+<header class="header">
 
-      <div class="service-number">
-        ${String(index + 1).padStart(2, "0")}
-      </div>
+  <div class="logo">
+    <span>Débora Nail ♡</span>
+    <small>CLUBE VIP</small>
+  </div>
 
-      ${
-        service[3].length
-          ? `
-            <div class="service-images">
-              ${service[3]
-                .map(
-                  image => `
-                    <img
-                      src="${image}"
-                      alt="${service[0]}"
-                    >
-                  `
-                )
-                .join("")}
-            </div>
-          `
-          : ""
-      }
+  <button class="menu-btn" id="menuBtn">☰</button>
 
-      <div class="service-content">
+  <nav id="nav">
 
-        <h3>${service[0]}</h3>
+    <a href="#inicio">INÍCIO</a>
+    <a href="#sobre">SOBRE</a>
+    <a href="#servicos">SERVIÇOS</a>
+    <a href="#vantagens">VANTAGENS</a>
+    <a href="#galeria">GALERIA</a>
+    <a href="#contato">CONTATO</a>
 
-        <p>${service[2]}</p>
-
-        <div class="service-bottom">
-
-          <strong>
-            ${money(service[1])}
-          </strong>
-
-          <button
-            class="primary small"
-            onclick="openBooking(${index})">
-            Agendar
-          </button>
-
-        </div>
-
-      </div>
-
-    </article>
-  `).join("");
-}
-
-
-function renderGallery() {
-  if (!galleryGrid) return;
-
-  const photos = SERVICES.flatMap(service =>
-    service[3].map(image => ({
-      image,
-      name: service[0]
-    }))
-  );
-
-  galleryGrid.innerHTML = photos
-    .map(photo => `
-      <figure>
-
-        <img
-          src="${photo.image}"
-          alt="${photo.name}"
-        >
-
-        <figcaption>
-          ${photo.name}
-        </figcaption>
-
-      </figure>
-    `)
-    .join("");
-}
-
-
-function showModal(content) {
-  const modalContent = document.getElementById("modalContent");
-  const modal = document.getElementById("modal");
-
-  if (!modalContent || !modal) return;
-
-  modalContent.innerHTML = content;
-  modal.classList.add("show");
-}
-
-
-function closeModal() {
-  document.getElementById("modal")?.classList.remove("show");
-}
-
-
-function openBooking(index = null) {
-
-  showModal(`
-
-    <h2>Agendar horário</h2>
-
-    <p>
-      Escolha o serviço, a data e o horário desejado.
-    </p>
-
-    <label>
-      Serviço
-
-      <select id="bookingService">
-
-        ${SERVICES
-          .map(
-            (service, number) => `
-              <option
-                ${number === index ? "selected" : ""}
-              >
-                ${service[0]} — ${money(service[1])}
-              </option>
-            `
-          )
-          .join("")}
-
-      </select>
-
-    </label>
-
-
-    <label>
-      Data
-
-      <input
-        id="bookingDate"
-        type="date"
-      >
-    </label>
-
-
-    <label>
-      Horário
-
-      <input
-        id="bookingTime"
-        type="time"
-        min="07:00"
-        max="19:00"
-      >
-    </label>
-
-
-    <button
-      class="primary full"
-      onclick="sendBooking()">
-
-      Continuar pelo WhatsApp
-
+    <button class="vip-button" id="loginBtn">
+      🔒 ÁREA VIP
     </button>
 
-  `);
-}
+  </nav>
+
+</header>
 
 
-function sendBooking() {
+<main>
 
-  const service =
-    document.getElementById("bookingService")?.value;
+<!-- INÍCIO -->
 
-  const date =
-    document.getElementById("bookingDate")?.value;
+<section class="hero" id="inicio">
 
-  const time =
-    document.getElementById("bookingTime")?.value;
+  <div class="hero-content">
 
+    <p class="eyebrow">BEM-VINDA AO</p>
 
-  if (!service || !date || !time) {
+    <h1>
+      Clube VIP
+      <em>Débora Nail ♡</em>
+    </h1>
 
-    alert(
-      "Preencha o serviço, a data e o horário."
-    );
+    <p class="hero-text">
+      Um espaço exclusivo para quem ama cuidar
+      das unhas e aproveitar benefícios especiais.
+    </p>
 
-    return;
-  }
+    <button
+      class="main-button"
+      onclick="openVip()">
+      ♕ ENTRAR NA ÁREA VIP
+    </button>
 
+    <div class="hero-benefits">
 
-  const message = `
-Olá, Débora! 💗
+      <div>
+        <span>♢</span>
+        <strong>Benefícios<br>exclusivos</strong>
+      </div>
 
-Gostaria de agendar:
+      <div>
+        <span>▦</span>
+        <strong>Agendamento<br>prático</strong>
+      </div>
 
-Serviço: ${service}
-Data: ${date}
-Horário: ${time}
-  `.trim();
+      <div>
+        <span>♡</span>
+        <strong>Atendimento<br>especial</strong>
+      </div>
 
+    </div>
 
-  window.open(
-    `https://wa.me/5531972084333?text=${encodeURIComponent(message)}`,
-    "_blank"
-  );
-}
-
-
-document
-  .getElementById("modal")
-  ?.addEventListener("click", event => {
-
-    if (event.target.id === "modal") {
-      closeModal();
-    }
-
-  });
+  </div>
 
 
-document
-  .getElementById("loginBtn")
-  ?.addEventListener("click", () => {
+  <div class="hero-photo">
 
-    showModal(`
+    <img
+      src="imagens/debora-spa.jpeg"
+      alt="Débora Nail">
 
-      <h2>Área VIP ♡</h2>
+    <img
+      src="imagens/debora-studio.jpeg"
+      alt="Débora Nail">
+
+    <img
+      src="imagens/debora-atendimento.jpeg"
+      alt="Débora Nail">
+
+  </div>
+
+</section>
+
+
+<!-- ÁREA VIP -->
+
+<section class="vip-dashboard">
+
+  <div class="vip-intro">
+
+    <p class="eyebrow">CLUBE VIP DÉBORA NAIL</p>
+
+    <h2>
+      Olá, Cliente VIP! 💗
+    </h2>
+
+    <p>
+      Aqui você tem acesso a um mundo de vantagens
+      pensado especialmente para você.
+    </p>
+
+    <button
+      class="outline-button"
+      onclick="openVip()">
+      ♙ MEUS DADOS
+    </button>
+
+  </div>
+
+
+  <div class="vip-card">
+
+    <span>SEU NÍVEL</span>
+
+    <div class="vip-icon">♕</div>
+
+    <strong id="vipLevel">
+      CLIENTE VIP
+    </strong>
+
+    <button onclick="showBenefits()">
+      VER BENEFÍCIOS
+    </button>
+
+  </div>
+
+
+  <div class="vip-card">
+
+    <span>PONTOS ACUMULADOS</span>
+
+    <div class="vip-icon">☆</div>
+
+    <strong id="vipPoints">
+      0 pts
+    </strong>
+
+    <button onclick="showHistory()">
+      VER HISTÓRICO
+    </button>
+
+  </div>
+
+
+  <div class="vip-card">
+
+    <span>BENEFÍCIO DISPONÍVEL</span>
+
+    <div class="vip-icon">🎁</div>
+
+    <strong id="vipBenefit">
+      0
+    </strong>
+
+    <button onclick="showBenefits()">
+      VER BENEFÍCIO
+    </button>
+
+  </div>
+
+</section>
+
+
+<!-- ATALHOS -->
+
+<section class="shortcut-grid">
+
+  <button
+    class="shortcut"
+    onclick="openBooking()">
+
+    <div class="shortcut-image">
+      <img src="imagens/debora-studio.jpeg" alt="">
+    </div>
+
+    <div>
+
+      <span class="shortcut-icon">▦</span>
+
+      <h3>
+        AGENDAR<br>
+        ATENDIMENTO
+      </h3>
 
       <p>
-        Em breve você poderá acessar sua
-        área exclusiva, acompanhar seus pontos
-        e consultar seus benefícios.
+        Escolha o melhor horário para você.
       </p>
 
-      <button
-        class="primary full"
-        onclick="closeModal()">
+    </div>
 
-        Entendi
-
-      </button>
-
-    `);
-
-  });
+  </button>
 
 
-document
-  .getElementById("loginBtn2")
-  ?.addEventListener("click", () => {
+  <button
+    class="shortcut"
+    onclick="showHistory()">
 
-    document
-      .getElementById("loginBtn")
-      ?.click();
+    <div class="shortcut-image">
+      <img src="imagens/fibra-1.jpeg" alt="">
+    </div>
 
-  });
+    <div>
+
+      <span class="shortcut-icon">♡</span>
+
+      <h3>
+        MEUS<br>
+        ATENDIMENTOS
+      </h3>
+
+      <p>
+        Veja seu histórico de atendimentos.
+      </p>
+
+    </div>
+
+  </button>
 
 
-document
-  .getElementById("menuBtn")
-  ?.addEventListener("click", () => {
+  <button
+    class="shortcut"
+    onclick="showBenefits()">
 
-    document
-      .getElementById("nav")
-      ?.classList.toggle("open");
+    <div class="shortcut-image">
+      <img src="imagens/soft-gel-1.jpeg" alt="">
+    </div>
 
-  });
+    <div>
+
+      <span class="shortcut-icon">🎁</span>
+
+      <h3>
+        VANTAGENS<br>
+        EXCLUSIVAS
+      </h3>
+
+      <p>
+        Descontos e benefícios só para VIPs.
+      </p>
+
+    </div>
+
+  </button>
 
 
-renderServices();
-renderGallery();
+  <button
+    class="shortcut"
+    onclick="showNews()">
+
+    <div class="shortcut-image">
+      <img src="imagens/plastica-pes-1.jpeg" alt="">
+    </div>
+
+    <div>
+
+      <span class="shortcut-icon">♧</span>
+
+      <h3>
+        AVISOS E<br>
+        NOVIDADES
+      </h3>
+
+      <p>
+        Fique por dentro das novidades.
+      </p>
+
+    </div>
+
+  </button>
+
+</section>
+
+
+<!-- VANTAGENS -->
+
+<section class="benefits-section" id="vantagens">
+
+  <div class="benefits-title">
+
+    <p class="eyebrow">
+      CLUBE VIP DÉBORA NAIL
+    </p>
+
+    <h2>
+      Ser VIP é ter<br>
+      cuidados e privilégios
+    </h2>
+
+    <p>
+      Aqui você se sente única e especial!
+    </p>
+
+    <button
+      class="main-button"
+      onclick="showBenefits()">
+      VER TODOS OS BENEFÍCIOS ♢
+    </button>
+
+  </div>
+
+
+  <div class="benefit-item">
+
+    <span>🎟</span>
+
+    <strong>
+      Descontos<br>
+      Especiais
+    </strong>
+
+  </div>
+
+
+  <div class="benefit-item">
+
+    <span>▦</span>
+
+    <strong>
+      Prioridade no<br>
+      Agendamento
+    </strong>
+
+  </div>
+
+
+  <div class="benefit-item">
+
+    <span>🎁</span>
+
+    <strong>
+      Brindes<br>
+      Exclusivos
+    </strong>
+
+  </div>
+
+
+  <div class="benefit-item">
+
+    <span>♙</span>
+
+    <strong>
+      Atendimento<br>
+      Personalizado
+    </strong>
+
+  </div>
+
+</section>
+
+
+<!-- SOBRE MIM -->
+
+<section class="about-section" id="sobre">
+
+  <div class="about-image">
+
+    <img
+      src="imagens/debora-spa.jpeg"
+      alt="Débora Aparecida Nail Design">
+
+  </div>
+
+
+  <div class="about-content">
+
+    <p class="eyebrow">
+      UM POUCO DA MINHA HISTÓRIA
+    </p>
+
+    <h2>
+      Muito mais que unhas,<br>
+      um momento só seu.
+    </h2>
+
+    <p>
+      Olá! Meu nome é Débora e trabalho na área
+      de manicure e pedicure desde 2019.
+    </p>
+
+    <p>
+      Comecei atendendo com manicure e pedicure
+      simples, indo até a casa das clientes.
+      Com o tempo, busquei novos conhecimentos,
+      fiz cursos e me especializei em unhas de gel.
+    </p>
+
+    <p>
+      Hoje tenho meu próprio studio, preparado para
+      receber cada cliente com cuidado, capricho
+      e atenção aos detalhes.
+    </p>
+
+    <p>
+      Meu objetivo é que cada atendimento seja mais
+      do que um procedimento: seja um momento para
+      você se cuidar, relaxar e sair se sentindo
+      ainda mais linda. 💗
+    </p>
+
+  </div>
+
+</section>
+
+
+<!-- SERVIÇOS -->
+
+<section class="services-section" id="servicos">
+
+  <div class="section-heading">
+
+    <p class="eyebrow">
+      CUIDADOS PARA VOCÊ
+    </p>
+
+    <h2>
+      Nossos Serviços
+    </h2>
+
+    <p>
+      Escolha seu procedimento e venha viver
+      um momento especial.
+    </p>
+
+  </div>
+
+
+  <div
+    class="services-grid"
+    id="servicesGrid">
+  </div>
+
+</section>
+
+
+<!-- GALERIA -->
+
+<section class="gallery-section" id="galeria">
+
+  <div class="section-heading">
+
+    <p class="eyebrow">
+      INSPIRAÇÕES
+    </p>
+
+    <h2>
+      Galeria Débora Nail
+    </h2>
+
+    <p>
+      Alguns dos trabalhos realizados no studio.
+    </p>
+
+  </div>
+
+
+  <div
+    class="gallery-grid"
+    id="galleryGrid">
+  </div>
+
+</section>
+
+
+<!-- CONTATO -->
+
+<section class="contact-section" id="contato">
+
+  <div>
+
+    <p class="eyebrow">
+      VAMOS MARCAR SEU HORÁRIO?
+    </p>
+
+    <h2>
+      Será um prazer<br>
+      receber você. 💗
+    </h2>
+
+    <p>
+      Rua Claudionor de Souza, 75<br>
+      Oratórios — MG
+    </p>
+
+    <p>
+      Na rua de baixo da antiga creche.
+    </p>
+
+  </div>
+
+
+  <div class="contact-actions">
+
+    <button
+      class="main-button"
+      onclick="openBooking()">
+      ▦ AGENDAR HORÁRIO
+    </button>
+
+
+    <a
+      class="whatsapp-button"
+      href="https://wa.me/5531972084333"
+      target="_blank">
+      ☎ FALAR NO WHATSAPP
+    </a>
+
+
+    <a
+      class="instagram-button"
+      href="https://www.instagram.com/perfectlynails02"
+      target="_blank">
+      ◎ @perfectlynails02
+    </a>
+
+  </div>
+
+</section>
+
+</main>
+
+
+<footer>
+
+  <strong>
+    Débora Nail ♡
+  </strong>
+
+  <span>
+    NAIL DESIGN
+  </span>
+
+  <p>
+    Mais que unhas, um momento só seu.
+  </p>
+
+  <small>
+    © 2026 Débora Aparecida Nail Design
+  </small>
+
+</footer>
+
+
+<!-- JANELA / MODAL -->
+
+<div
+  class="modal"
+  id="modal">
+
+  <div
+    class="modal-box"
+    id="modalContent">
+
+    <button
+      class="close-modal"
+      onclick="closeModal()">
+      ×
+    </button>
+
+  </div>
+
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
