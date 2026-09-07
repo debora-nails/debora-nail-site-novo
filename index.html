@@ -1,9 +1,8 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
-
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <title>Débora Aparecida Nail Design</title>
 
@@ -20,8 +19,8 @@
 <header class="topbar">
 
   <div class="brand">
-    <span>Débora Nail</span>
-    <small>♡ CLUBE VIP</small>
+    <span>Débora Nail ♡</span>
+    <small>NAIL DESIGN</small>
   </div>
 
   <button class="menu-btn" id="menuBtn">☰</button>
@@ -45,9 +44,9 @@
 
 <main>
 
-<!-- =========================
+<!-- =======================
      INÍCIO
-========================= -->
+======================= -->
 
 <section class="hero" id="inicio">
 
@@ -63,8 +62,9 @@
     </h1>
 
     <p>
-      Cuidados, beleza e capricho em cada atendimento,
-      em um studio preparado para receber você.
+      Beleza, autoestima e cuidado em um só lugar.
+      Cada detalhe pensado para proporcionar
+      uma experiência especial.
     </p>
 
     <div class="actions">
@@ -72,7 +72,7 @@
       <button
         class="primary"
         onclick="openBooking()">
-        Agendar horário
+        ♡ Agendar horário
       </button>
 
       <button
@@ -83,11 +83,31 @@
 
     </div>
 
+    <div class="hero-features">
+
+      <div>
+        <strong>♡</strong>
+        <span>Atendimento<br>com carinho</span>
+      </div>
+
+      <div>
+        <strong>◇</strong>
+        <span>Produtos<br>de qualidade</span>
+      </div>
+
+      <div>
+        <strong>♡</strong>
+        <span>Clientes<br>sempre satisfeitas</span>
+      </div>
+
+    </div>
+
   </div>
 
 
   <div class="hero-collage">
 
+    <!-- SUAS FOTOS ORIGINAIS -->
     <img
       src="imagens/debora-spa.jpeg"
       alt="Débora no studio"
@@ -95,12 +115,12 @@
 
     <img
       src="imagens/debora-studio.jpeg"
-      alt="Débora no atendimento"
+      alt="Débora Nail Design"
     >
 
     <img
       src="imagens/debora-atendimento.jpeg"
-      alt="Débora Nail Design"
+      alt="Débora no atendimento"
     >
 
   </div>
@@ -108,32 +128,13 @@
 </section>
 
 
-<!-- =========================
-     DESTAQUES
-========================= -->
-
-<section class="strip">
-
-  <div>
-    ♡ Atendimento com carinho
-  </div>
-
-  <div>
-    ✦ Studio preparado para você
-  </div>
-
-  <div>
-    ♡ Clube VIP Fidelidade
-  </div>
-
-</section>
-
-
-<!-- =========================
+<!-- =======================
      PROMOÇÕES
-========================= -->
+======================= -->
 
-<section class="section promotion-section" id="promocoes">
+<section
+  class="section promotion-section"
+  id="promocoes">
 
   <div class="section-head">
 
@@ -146,117 +147,116 @@
     </h2>
 
     <p>
-      Fique de olho nas novidades e aproveite
-      condições especiais por tempo limitado. 💗
+      Aproveite condições especiais para
+      cuidar de você. ♡
     </p>
 
   </div>
 
 
-  <div class="promotion-card">
+  <div class="promotion-grid">
 
-    <div class="promotion-content">
+    <article class="promotion-card">
 
-      <span class="promotion-tag">
-        ✨ PROMOÇÃO
-      </span>
+      <img
+        src="imagens/fibra-1.jpeg"
+        alt="Alongamento Fibra de Vidro"
+      >
 
-      <h3>
-        Cuide de você e aproveite!
-      </h3>
+      <div>
+        <span class="promotion-tag">
+          PROMOÇÃO
+        </span>
 
-      <p>
-        As promoções especiais da Débora Nail
-        serão divulgadas aqui. Acompanhe para
-        não perder nenhuma oportunidade.
-      </p>
+        <h3>
+          Alongamento em Fibra
+        </h3>
 
-      <button
-        class="primary"
-        onclick="openBooking()">
-        Agendar horário
-      </button>
+        <p>
+          Uma opção elegante para deixar
+          suas unhas ainda mais lindas.
+        </p>
 
-    </div>
+        <button
+          class="primary small"
+          onclick="openBooking(1)">
+          Aproveitar
+        </button>
+      </div>
 
-    <div class="promotion-decoration">
-      ♡
-    </div>
+    </article>
+
+
+    <article class="promotion-card">
+
+      <img
+        src="imagens/plastica-pes-1.jpeg"
+        alt="Plástica dos Pés"
+      >
+
+      <div>
+        <span class="promotion-tag">
+          PROMOÇÃO
+        </span>
+
+        <h3>
+          Plástica dos Pés
+        </h3>
+
+        <p>
+          Um momento especial de cuidado
+          para seus pés.
+        </p>
+
+        <button
+          class="primary small"
+          onclick="openBooking(8)">
+          Aproveitar
+        </button>
+      </div>
+
+    </article>
+
+
+    <article class="promotion-card">
+
+      <img
+        src="imagens/soft-gel-1.jpeg"
+        alt="Soft Gel"
+      >
+
+      <div>
+        <span class="promotion-tag">
+          PROMOÇÃO
+        </span>
+
+        <h3>
+          Soft Gel
+        </h3>
+
+        <p>
+          Leveza, beleza e um acabamento
+          delicado.
+        </p>
+
+        <button
+          class="primary small"
+          onclick="openBooking(4)">
+          Aproveitar
+        </button>
+
+      </div>
+
+    </article>
 
   </div>
 
 </section>
 
 
-<!-- =========================
-     SOBRE
-========================= -->
-
-<section class="section" id="sobre">
-
-  <div class="section-head">
-
-    <span class="eyebrow">
-      SOBRE MIM
-    </span>
-
-    <h2>
-      Um pouco da minha história
-    </h2>
-
-  </div>
-
-
-  <div class="about">
-
-    <div>
-
-      <p>
-        Olá! Meu nome é Débora e trabalho na área
-        de manicure e pedicure desde 2019.
-      </p>
-
-      <p>
-        Comecei atendendo com manicure e pedicure
-        simples, indo até a casa das clientes.
-        Com o tempo, busquei novos conhecimentos,
-        fiz cursos e me especializei em unhas de gel.
-      </p>
-
-      <p>
-        Hoje tenho meu próprio studio, preparado
-        para receber cada cliente com cuidado,
-        capricho e atenção aos detalhes.
-      </p>
-
-      <p>
-        Meu objetivo é que cada atendimento seja
-        mais do que um procedimento: seja um momento
-        para você se cuidar, relaxar e sair se
-        sentindo ainda mais linda. 💗
-      </p>
-
-    </div>
-
-
-    <div class="quote">
-
-      “Mais que unhas,<br>
-
-      <strong>
-        um momento só seu.
-      </strong>
-
-    </div>
-
-  </div>
-
-</section>
-
-
-<!-- =========================
+<!-- =======================
      SERVIÇOS
-========================= -->
+======================= -->
 
 <section
   class="section pink"
@@ -265,16 +265,16 @@
   <div class="section-head">
 
     <span class="eyebrow">
-      SERVIÇOS
+      NOSSOS SERVIÇOS
     </span>
 
     <h2>
-      Escolha seu momento de beleza
+      Beleza em todas as ocasiões
     </h2>
 
     <p>
-      Veja os procedimentos disponíveis
-      e escolha o que combina com você.
+      Escolha seu procedimento e venha
+      viver seu momento Débora Nail.
     </p>
 
   </div>
@@ -288,69 +288,126 @@
 </section>
 
 
-<!-- =========================
-     VIP
-========================= -->
+<!-- =======================
+     SOBRE MIM
+======================= -->
 
 <section
-  class="section"
-  id="vip">
+  class="section about-section"
+  id="sobre">
 
-  <div class="section-head">
+  <div class="about-photo">
 
-    <span class="eyebrow">
-      VIP FIDELIDADE
-    </span>
-
-    <h2>
-      Seu carinho vira benefícios
-    </h2>
+    <!-- SUA FOTO ORIGINAL -->
+    <img
+      src="imagens/debora-spa.jpeg"
+      alt="Débora Aparecida Nail Design"
+    >
 
   </div>
 
 
+  <div class="about-content">
+
+    <span class="eyebrow">
+      SOBRE MIM
+    </span>
+
+    <h2>
+      Um pouco da minha história ♡
+    </h2>
+
+    <p>
+      Olá! Meu nome é Débora e trabalho na área
+      de manicure e pedicure desde 2019.
+    </p>
+
+    <p>
+      Comecei atendendo com manicure e pedicure
+      simples, indo até a casa das clientes.
+      Com o tempo, busquei novos conhecimentos,
+      fiz cursos e me especializei em unhas de gel.
+    </p>
+
+    <p>
+      Hoje tenho meu próprio studio, preparado
+      para receber cada cliente com cuidado,
+      capricho e atenção aos detalhes.
+    </p>
+
+    <p>
+      Meu objetivo é que cada atendimento seja
+      mais do que um procedimento: seja um momento
+      para você se cuidar, relaxar e sair se
+      sentindo ainda mais linda. ♡
+    </p>
+
+    <div class="about-signature">
+      Aqui, cada detalhe é feito com amor. ♡
+    </div>
+
+  </div>
+
+</section>
+
+
+<!-- =======================
+     VIP
+======================= -->
+
+<section
+  class="section vip-section"
+  id="vip">
+
   <div class="vip-box">
 
-    <div>
+    <div class="vip-intro">
 
-      <div class="points">
-        10
-        <small>pontos</small>
-      </div>
+      <span class="eyebrow">
+        CLUBE VIP
+      </span>
 
-      <h3>
-        Complete sua cartela
-      </h3>
+      <h2>
+        Seu carinho vira benefícios!
+      </h2>
 
       <p>
-        A cada visita/procedimento você ganha
-        1 ponto.
-        Ao chegar a 10 pontos, você ganha
+        A cada visita você ganha 1 ponto.
+        Complete 10 pontos e ganhe
         <strong>60% de desconto</strong>
-        em qualquer procedimento escolhido.
+        em qualquer procedimento.
       </p>
+
+      <button
+        class="primary"
+        id="loginBtn2">
+        Quero fazer parte
+      </button>
 
     </div>
 
 
-    <div class="rules">
+    <div class="vip-points">
 
-      <p>
-        ✓ 2 procedimentos no mesmo dia = 1 ponto
-      </p>
+      <div class="points">
+        10
+        <small>PONTOS</small>
+      </div>
 
-      <p>
-        ✓ Faltou ou avisou em cima da hora = perde 1 ponto
-      </p>
+      <div>
+        <strong>♡ Acumule pontos</strong>
+        <span>1 ponto por visita</span>
+      </div>
 
-      <p>
-        ✓ Ao usar o benefício, os pontos voltam para 0
-      </p>
+      <div>
+        <strong>◇ Ganhe desconto</strong>
+        <span>60% ao completar 10</span>
+      </div>
 
-      <p>
-        ✓ Depois de completar 10 pontos,
-        você tem 45 dias para usar o benefício
-      </p>
+      <div>
+        <strong>♡ Aproveite</strong>
+        <span>45 dias para usar</span>
+      </div>
 
     </div>
 
@@ -359,9 +416,9 @@
 </section>
 
 
-<!-- =========================
+<!-- =======================
      GALERIA
-========================= -->
+======================= -->
 
 <section
   class="section pink"
@@ -374,8 +431,13 @@
     </span>
 
     <h2>
-      Alguns dos meus trabalhos
+      Alguns dos meus trabalhos ♡
     </h2>
+
+    <p>
+      Um pouquinho do meu trabalho feito
+      com carinho e dedicação.
+    </p>
 
   </div>
 
@@ -388,23 +450,27 @@
 </section>
 
 
-<!-- =========================
+<!-- =======================
      CONTATO
-========================= -->
+======================= -->
 
 <section
-  class="section"
+  class="section contact-section"
   id="contato">
 
   <div class="section-head">
 
     <span class="eyebrow">
-      CONTATO
+      FALE COMIGO
     </span>
 
     <h2>
       Vamos marcar seu horário?
     </h2>
+
+    <p>
+      Será um prazer receber você. ♡
+    </p>
 
   </div>
 
@@ -413,13 +479,33 @@
 
     <div class="contact-card">
 
-      <h3>
-        📍 Studio
-      </h3>
+      <h3>♡ WhatsApp</h3>
 
       <p>
-        Rua Claudionor de Souza, 75 —
-        Oratórios, MG
+        (31) 97208-4333
+      </p>
+
+    </div>
+
+
+    <div class="contact-card">
+
+      <h3>♡ Instagram</h3>
+
+      <p>
+        @perfectlynails02
+      </p>
+
+    </div>
+
+
+    <div class="contact-card">
+
+      <h3>♡ Studio</h3>
+
+      <p>
+        Rua Claudionor de Souza, 75
+        — Oratórios, MG
       </p>
 
       <small>
@@ -431,30 +517,11 @@
 
     <div class="contact-card">
 
-      <h3>
-        🕘 Horário
-      </h3>
+      <h3>♡ Horário</h3>
 
       <p>
         07h às 19h
       </p>
-
-    </div>
-
-
-    <div class="contact-card">
-
-      <h3>
-        💳 Pagamento
-      </h3>
-
-      <p>
-        Pix, dinheiro e cartão.
-      </p>
-
-      <small>
-        No cartão, há o acréscimo da máquina.
-      </small>
 
     </div>
 
@@ -467,14 +534,14 @@
       class="primary link"
       href="https://wa.me/5531972084333"
       target="_blank">
-      WhatsApp
+      Falar no WhatsApp
     </a>
 
     <a
       class="secondary link"
       href="https://www.instagram.com/perfectlynails02"
       target="_blank">
-      Instagram @perfectlynails02
+      Instagram
     </a>
 
   </div>
@@ -484,9 +551,9 @@
 </main>
 
 
-<!-- =========================
+<!-- =======================
      RODAPÉ
-========================= -->
+======================= -->
 
 <footer>
 
@@ -501,9 +568,9 @@
 </footer>
 
 
-<!-- =========================
+<!-- =======================
      MODAL
-========================= -->
+======================= -->
 
 <div
   class="modal"
@@ -524,10 +591,6 @@
 </div>
 
 
-<!-- =========================
-     SCRIPTS
-========================= -->
-
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
 <script src="config.js"></script>
@@ -536,3 +599,4 @@
 
 </body>
 </html>
+ 
