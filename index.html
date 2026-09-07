@@ -1,601 +1,340 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+const SERVICES = [
+  [
+    "Alongamento Mold F1",
+    135,
+    "Alongamento construído com molde F1, estrutura personalizada e acabamento elegante.",
+    ["imagens/mold-f1-1.jpeg", "imagens/mold-f1-2.jpeg"]
+  ],
+  [
+    "Alongamento Fibra de Vidro",
+    140,
+    "Alongamento com fibra de vidro, resultado delicado, estruturado e personalizado.",
+    ["imagens/fibra-1.jpeg", "imagens/fibra-2.jpeg"]
+  ],
+  [
+    "Banho de Gel",
+    80,
+    "Aplicação de gel sobre a unha natural para reforçar estrutura e acabamento.",
+    ["imagens/banho-gel-1.jpeg", "imagens/banho-gel-2.jpeg"]
+  ],
+  [
+    "Postiça Realista",
+    35,
+    "Visual natural e acabamento delicado, uma opção prática para suas unhas.",
+    [
+      "imagens/postica-1.jpeg",
+      "imagens/postica-2.jpeg",
+      "imagens/postica-3.jpeg"
+    ]
+  ],
+  [
+    "Soft Gel",
+    40,
+    "Alongamento com tips de gel, leve, uniforme e elegante.",
+    ["imagens/soft-gel-1.jpeg", "imagens/soft-gel-2.jpeg"]
+  ],
+  [
+    "Manicure",
+    24,
+    "Cuidado das unhas das mãos, preparação, acabamento e esmaltação conforme escolha.",
+    []
+  ],
+  [
+    "Pedicure",
+    24,
+    "Cuidado das unhas dos pés, preparação, acabamento e esmaltação conforme escolha.",
+    ["imagens/pedicure-1.jpeg"]
+  ],
+  [
+    "Spa dos Pés",
+    50,
+    "Cuidado e relaxamento para os pés, com pedicure incluso.",
+    []
+  ],
+  [
+    "Plástica dos Pés",
+    65,
+    "Cuidado especial para melhorar a aparência e a sensação de maciez dos pés.",
+    ["imagens/plastica-pes-1.jpeg", "imagens/plastica-pes-2.jpeg"]
+  ]
+];
 
-  <title>Débora Aparecida Nail Design</title>
+const grid = document.getElementById("servicesGrid");
+const galleryGrid = document.getElementById("galleryGrid");
 
-  <meta
-    name="description"
-    content="Débora Aparecida Nail Design — Mais que unhas, um momento só seu."
-  >
-
-  <link rel="stylesheet" href="styles.css">
-</head>
-
-<body>
-
-<header class="topbar">
-
-  <div class="brand">
-    <span>Débora Nail ♡</span>
-    <small>NAIL DESIGN</small>
-  </div>
-
-  <button class="menu-btn" id="menuBtn">☰</button>
-
-  <nav id="nav">
-    <a href="#inicio">Início</a>
-    <a href="#promocoes">Promoções</a>
-    <a href="#servicos">Serviços</a>
-    <a href="#vip">VIP</a>
-    <a href="#sobre">Sobre</a>
-    <a href="#galeria">Galeria</a>
-    <a href="#contato">Contato</a>
-
-    <button class="outline-btn" id="loginBtn">
-      Área VIP
-    </button>
-  </nav>
-
-</header>
+const money = value =>
+  value.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
 
 
-<main>
+function renderServices() {
+  if (!grid) return;
 
-<!-- =======================
-     INÍCIO
-======================= -->
+  grid.innerHTML = SERVICES.map((service, index) => `
+    <article class="service-card">
 
-<section class="hero" id="inicio">
-
-  <div class="hero-text">
-
-    <span class="eyebrow">
-      CLUBE VIP · DÉBORA NAIL
-    </span>
-
-    <h1>
-      Mais que unhas,<br>
-      <em>um momento só seu.</em>
-    </h1>
-
-    <p>
-      Beleza, autoestima e cuidado em um só lugar.
-      Cada detalhe pensado para proporcionar
-      uma experiência especial.
-    </p>
-
-    <div class="actions">
-
-      <button
-        class="primary"
-        onclick="openBooking()">
-        ♡ Agendar horário
-      </button>
-
-      <button
-        class="secondary"
-        onclick="document.querySelector('#servicos').scrollIntoView({behavior:'smooth'})">
-        Conhecer serviços
-      </button>
-
-    </div>
-
-    <div class="hero-features">
-
-      <div>
-        <strong>♡</strong>
-        <span>Atendimento<br>com carinho</span>
+      <div class="service-number">
+        ${String(index + 1).padStart(2, "0")}
       </div>
 
-      <div>
-        <strong>◇</strong>
-        <span>Produtos<br>de qualidade</span>
-      </div>
+      ${
+        service[3].length
+          ? `
+            <div class="service-images">
+              ${service[3]
+                .map(
+                  image => `
+                    <img
+                      src="${image}"
+                      alt="${service[0]}"
+                    >
+                  `
+                )
+                .join("")}
+            </div>
+          `
+          : ""
+      }
 
-      <div>
-        <strong>♡</strong>
-        <span>Clientes<br>sempre satisfeitas</span>
-      </div>
+      <div class="service-content">
 
-    </div>
+        <h3>${service[0]}</h3>
 
-  </div>
+        <p>${service[2]}</p>
 
+        <div class="service-bottom">
 
-  <div class="hero-collage">
+          <strong>
+            ${money(service[1])}
+          </strong>
 
-    <!-- SUAS FOTOS ORIGINAIS -->
-    <img
-      src="imagens/debora-spa.jpeg"
-      alt="Débora no studio"
-    >
+          <button
+            class="primary small"
+            onclick="openBooking(${index})">
+            Agendar
+          </button>
 
-    <img
-      src="imagens/debora-studio.jpeg"
-      alt="Débora Nail Design"
-    >
-
-    <img
-      src="imagens/debora-atendimento.jpeg"
-      alt="Débora no atendimento"
-    >
-
-  </div>
-
-</section>
-
-
-<!-- =======================
-     PROMOÇÕES
-======================= -->
-
-<section
-  class="section promotion-section"
-  id="promocoes">
-
-  <div class="section-head">
-
-    <span class="eyebrow">
-      OFERTAS ESPECIAIS
-    </span>
-
-    <h2>
-      Promoções Débora Nail
-    </h2>
-
-    <p>
-      Aproveite condições especiais para
-      cuidar de você. ♡
-    </p>
-
-  </div>
-
-
-  <div class="promotion-grid">
-
-    <article class="promotion-card">
-
-      <img
-        src="imagens/fibra-1.jpeg"
-        alt="Alongamento Fibra de Vidro"
-      >
-
-      <div>
-        <span class="promotion-tag">
-          PROMOÇÃO
-        </span>
-
-        <h3>
-          Alongamento em Fibra
-        </h3>
-
-        <p>
-          Uma opção elegante para deixar
-          suas unhas ainda mais lindas.
-        </p>
-
-        <button
-          class="primary small"
-          onclick="openBooking(1)">
-          Aproveitar
-        </button>
-      </div>
-
-    </article>
-
-
-    <article class="promotion-card">
-
-      <img
-        src="imagens/plastica-pes-1.jpeg"
-        alt="Plástica dos Pés"
-      >
-
-      <div>
-        <span class="promotion-tag">
-          PROMOÇÃO
-        </span>
-
-        <h3>
-          Plástica dos Pés
-        </h3>
-
-        <p>
-          Um momento especial de cuidado
-          para seus pés.
-        </p>
-
-        <button
-          class="primary small"
-          onclick="openBooking(8)">
-          Aproveitar
-        </button>
-      </div>
-
-    </article>
-
-
-    <article class="promotion-card">
-
-      <img
-        src="imagens/soft-gel-1.jpeg"
-        alt="Soft Gel"
-      >
-
-      <div>
-        <span class="promotion-tag">
-          PROMOÇÃO
-        </span>
-
-        <h3>
-          Soft Gel
-        </h3>
-
-        <p>
-          Leveza, beleza e um acabamento
-          delicado.
-        </p>
-
-        <button
-          class="primary small"
-          onclick="openBooking(4)">
-          Aproveitar
-        </button>
+        </div>
 
       </div>
 
     </article>
-
-  </div>
-
-</section>
+  `).join("");
+}
 
 
-<!-- =======================
-     SERVIÇOS
-======================= -->
+function renderGallery() {
+  if (!galleryGrid) return;
 
-<section
-  class="section pink"
-  id="servicos">
+  const photos = SERVICES.flatMap(service =>
+    service[3].map(image => ({
+      image,
+      name: service[0]
+    }))
+  );
 
-  <div class="section-head">
+  galleryGrid.innerHTML = photos
+    .map(photo => `
+      <figure>
 
-    <span class="eyebrow">
-      NOSSOS SERVIÇOS
-    </span>
+        <img
+          src="${photo.image}"
+          alt="${photo.name}"
+        >
 
-    <h2>
-      Beleza em todas as ocasiões
-    </h2>
+        <figcaption>
+          ${photo.name}
+        </figcaption>
 
-    <p>
-      Escolha seu procedimento e venha
-      viver seu momento Débora Nail.
-    </p>
-
-  </div>
-
-
-  <div
-    id="servicesGrid"
-    class="cards">
-  </div>
-
-</section>
+      </figure>
+    `)
+    .join("");
+}
 
 
-<!-- =======================
-     SOBRE MIM
-======================= -->
+function showModal(content) {
+  const modalContent = document.getElementById("modalContent");
+  const modal = document.getElementById("modal");
 
-<section
-  class="section about-section"
-  id="sobre">
+  if (!modalContent || !modal) return;
 
-  <div class="about-photo">
-
-    <!-- SUA FOTO ORIGINAL -->
-    <img
-      src="imagens/debora-spa.jpeg"
-      alt="Débora Aparecida Nail Design"
-    >
-
-  </div>
+  modalContent.innerHTML = content;
+  modal.classList.add("show");
+}
 
 
-  <div class="about-content">
+function closeModal() {
+  document.getElementById("modal")?.classList.remove("show");
+}
 
-    <span class="eyebrow">
-      SOBRE MIM
-    </span>
 
-    <h2>
-      Um pouco da minha história ♡
-    </h2>
+function openBooking(index = null) {
+
+  showModal(`
+
+    <h2>Agendar horário</h2>
 
     <p>
-      Olá! Meu nome é Débora e trabalho na área
-      de manicure e pedicure desde 2019.
+      Escolha o serviço, a data e o horário desejado.
     </p>
 
-    <p>
-      Comecei atendendo com manicure e pedicure
-      simples, indo até a casa das clientes.
-      Com o tempo, busquei novos conhecimentos,
-      fiz cursos e me especializei em unhas de gel.
-    </p>
+    <label>
+      Serviço
 
-    <p>
-      Hoje tenho meu próprio studio, preparado
-      para receber cada cliente com cuidado,
-      capricho e atenção aos detalhes.
-    </p>
+      <select id="bookingService">
 
-    <p>
-      Meu objetivo é que cada atendimento seja
-      mais do que um procedimento: seja um momento
-      para você se cuidar, relaxar e sair se
-      sentindo ainda mais linda. ♡
-    </p>
+        ${SERVICES
+          .map(
+            (service, number) => `
+              <option
+                ${number === index ? "selected" : ""}
+              >
+                ${service[0]} — ${money(service[1])}
+              </option>
+            `
+          )
+          .join("")}
 
-    <div class="about-signature">
-      Aqui, cada detalhe é feito com amor. ♡
-    </div>
+      </select>
 
-  </div>
+    </label>
 
-</section>
 
+    <label>
+      Data
 
-<!-- =======================
-     VIP
-======================= -->
+      <input
+        id="bookingDate"
+        type="date"
+      >
+    </label>
 
-<section
-  class="section vip-section"
-  id="vip">
 
-  <div class="vip-box">
+    <label>
+      Horário
 
-    <div class="vip-intro">
+      <input
+        id="bookingTime"
+        type="time"
+        min="07:00"
+        max="19:00"
+      >
+    </label>
 
-      <span class="eyebrow">
-        CLUBE VIP
-      </span>
-
-      <h2>
-        Seu carinho vira benefícios!
-      </h2>
-
-      <p>
-        A cada visita você ganha 1 ponto.
-        Complete 10 pontos e ganhe
-        <strong>60% de desconto</strong>
-        em qualquer procedimento.
-      </p>
-
-      <button
-        class="primary"
-        id="loginBtn2">
-        Quero fazer parte
-      </button>
-
-    </div>
-
-
-    <div class="vip-points">
-
-      <div class="points">
-        10
-        <small>PONTOS</small>
-      </div>
-
-      <div>
-        <strong>♡ Acumule pontos</strong>
-        <span>1 ponto por visita</span>
-      </div>
-
-      <div>
-        <strong>◇ Ganhe desconto</strong>
-        <span>60% ao completar 10</span>
-      </div>
-
-      <div>
-        <strong>♡ Aproveite</strong>
-        <span>45 dias para usar</span>
-      </div>
-
-    </div>
-
-  </div>
-
-</section>
-
-
-<!-- =======================
-     GALERIA
-======================= -->
-
-<section
-  class="section pink"
-  id="galeria">
-
-  <div class="section-head">
-
-    <span class="eyebrow">
-      GALERIA
-    </span>
-
-    <h2>
-      Alguns dos meus trabalhos ♡
-    </h2>
-
-    <p>
-      Um pouquinho do meu trabalho feito
-      com carinho e dedicação.
-    </p>
-
-  </div>
-
-
-  <div
-    id="galleryGrid"
-    class="gallery">
-  </div>
-
-</section>
-
-
-<!-- =======================
-     CONTATO
-======================= -->
-
-<section
-  class="section contact-section"
-  id="contato">
-
-  <div class="section-head">
-
-    <span class="eyebrow">
-      FALE COMIGO
-    </span>
-
-    <h2>
-      Vamos marcar seu horário?
-    </h2>
-
-    <p>
-      Será um prazer receber você. ♡
-    </p>
-
-  </div>
-
-
-  <div class="contact-grid">
-
-    <div class="contact-card">
-
-      <h3>♡ WhatsApp</h3>
-
-      <p>
-        (31) 97208-4333
-      </p>
-
-    </div>
-
-
-    <div class="contact-card">
-
-      <h3>♡ Instagram</h3>
-
-      <p>
-        @perfectlynails02
-      </p>
-
-    </div>
-
-
-    <div class="contact-card">
-
-      <h3>♡ Studio</h3>
-
-      <p>
-        Rua Claudionor de Souza, 75
-        — Oratórios, MG
-      </p>
-
-      <small>
-        Na rua de baixo da antiga creche
-      </small>
-
-    </div>
-
-
-    <div class="contact-card">
-
-      <h3>♡ Horário</h3>
-
-      <p>
-        07h às 19h
-      </p>
-
-    </div>
-
-  </div>
-
-
-  <div class="contact-actions">
-
-    <a
-      class="primary link"
-      href="https://wa.me/5531972084333"
-      target="_blank">
-      Falar no WhatsApp
-    </a>
-
-    <a
-      class="secondary link"
-      href="https://www.instagram.com/perfectlynails02"
-      target="_blank">
-      Instagram
-    </a>
-
-  </div>
-
-</section>
-
-</main>
-
-
-<!-- =======================
-     RODAPÉ
-======================= -->
-
-<footer>
-
-  <strong>
-    Débora Aparecida Nail Design
-  </strong>
-
-  <span>
-    Mais que unhas, um momento só seu. ♡
-  </span>
-
-</footer>
-
-
-<!-- =======================
-     MODAL
-======================= -->
-
-<div
-  class="modal"
-  id="modal">
-
-  <div class="modal-box">
 
     <button
-      class="close"
-      onclick="closeModal()">
-      ×
+      class="primary full"
+      onclick="sendBooking()">
+
+      Continuar pelo WhatsApp
+
     </button>
 
-    <div id="modalContent"></div>
-
-  </div>
-
-</div>
+  `);
+}
 
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+function sendBooking() {
 
-<script src="config.js"></script>
+  const service =
+    document.getElementById("bookingService")?.value;
 
-<script src="app.js"></script>
+  const date =
+    document.getElementById("bookingDate")?.value;
 
-</body>
-</html>
+  const time =
+    document.getElementById("bookingTime")?.value;
+
+
+  if (!service || !date || !time) {
+
+    alert(
+      "Preencha o serviço, a data e o horário."
+    );
+
+    return;
+  }
+
+
+  const message = `
+Olá, Débora! 💗
+
+Gostaria de agendar:
+
+Serviço: ${service}
+Data: ${date}
+Horário: ${time}
+  `.trim();
+
+
+  window.open(
+    `https://wa.me/5531972084333?text=${encodeURIComponent(message)}`,
+    "_blank"
+  );
+}
+
+
+document
+  .getElementById("modal")
+  ?.addEventListener("click", event => {
+
+    if (event.target.id === "modal") {
+      closeModal();
+    }
+
+  });
+
+
+document
+  .getElementById("loginBtn")
+  ?.addEventListener("click", () => {
+
+    showModal(`
+
+      <h2>Área VIP ♡</h2>
+
+      <p>
+        Em breve você poderá acessar sua
+        área exclusiva, acompanhar seus pontos
+        e consultar seus benefícios.
+      </p>
+
+      <button
+        class="primary full"
+        onclick="closeModal()">
+
+        Entendi
+
+      </button>
+
+    `);
+
+  });
+
+
+document
+  .getElementById("loginBtn2")
+  ?.addEventListener("click", () => {
+
+    document
+      .getElementById("loginBtn")
+      ?.click();
+
+  });
+
+
+document
+  .getElementById("menuBtn")
+  ?.addEventListener("click", () => {
+
+    document
+      .getElementById("nav")
+      ?.classList.toggle("open");
+
+  });
+
+
+renderServices();
+renderGallery();
