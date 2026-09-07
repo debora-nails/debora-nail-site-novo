@@ -98,14 +98,12 @@ const SERVICES = [
   ],
 
   [
-  
-   ["Spa dos Pés",
+    "Spa dos Pés",
     50,
     "Cuidado e relaxamento para os pés, com pedicure incluso.",
     [
       "imagens/spa-pes-novo.jpeg",
-      "imagens/spa-pes-2.jpeg"]] 
-      
+      "imagens/spa-pes-2.jpeg"
     ],
     []
   ],
@@ -163,11 +161,13 @@ function renderServices() {
         }
 
         <div class="service-content">
+
           <h3>${name}</h3>
 
           <p>${description}</p>
 
           <div class="service-bottom">
+
             <strong>${money(price)}</strong>
 
             <button
@@ -176,7 +176,9 @@ function renderServices() {
             >
               Agendar
             </button>
+
           </div>
+
         </div>
 
       </article>
@@ -189,9 +191,9 @@ function renderGallery() {
 
   const gallery = SERVICES.flatMap(service => {
     const name = service[0];
-    const images = service[4] || [];
+    const galleryImages = service[4] || [];
 
-    return images.map(image => ({
+    return galleryImages.map(image => ({
       image,
       name
     }));
@@ -233,6 +235,7 @@ function openBooking(index = null) {
 
     <label>
       Serviço
+
       <select id="bookingService">
         ${SERVICES.map(
           (service, number) => `
@@ -246,11 +249,16 @@ function openBooking(index = null) {
 
     <label>
       Data
-      <input id="bookingDate" type="date">
+
+      <input
+        id="bookingDate"
+        type="date"
+      >
     </label>
 
     <label>
       Horário
+
       <input
         id="bookingTime"
         type="time"
@@ -259,16 +267,24 @@ function openBooking(index = null) {
       >
     </label>
 
-    <button class="primary full" onclick="sendBooking()">
+    <button
+      class="primary full"
+      onclick="sendBooking()"
+    >
       Continuar pelo WhatsApp
     </button>
   `);
 }
 
 function sendBooking() {
-  const service = document.getElementById("bookingService")?.value;
-  const date = document.getElementById("bookingDate")?.value;
-  const time = document.getElementById("bookingTime")?.value;
+  const service =
+    document.getElementById("bookingService")?.value;
+
+  const date =
+    document.getElementById("bookingDate")?.value;
+
+  const time =
+    document.getElementById("bookingTime")?.value;
 
   if (!service || !date || !time) {
     alert("Preencha serviço, data e horário.");
@@ -287,29 +303,40 @@ function sendBooking() {
   );
 }
 
-document.getElementById("modal")?.addEventListener("click", event => {
-  if (event.target.id === "modal") {
-    closeModal();
-  }
-});
+document
+  .getElementById("modal")
+  ?.addEventListener("click", event => {
+    if (event.target.id === "modal") {
+      closeModal();
+    }
+  });
 
-document.getElementById("loginBtn")?.addEventListener("click", () => {
-  showModal(`
-    <h2>Área VIP</h2>
+document
+  .getElementById("loginBtn")
+  ?.addEventListener("click", () => {
+    showModal(`
+      <h2>Área VIP</h2>
 
-    <p class="muted">
-      A área de cliente será conectada ao Supabase na próxima etapa.
-    </p>
+      <p class="muted">
+        A área de cliente será conectada ao Supabase na próxima etapa.
+      </p>
 
-    <button class="primary full" onclick="closeModal()">
-      Entendi
-    </button>
-  `);
-});
+      <button
+        class="primary full"
+        onclick="closeModal()"
+      >
+        Entendi
+      </button>
+    `);
+  });
 
-document.getElementById("menuBtn")?.addEventListener("click", () => {
-  document.getElementById("nav")?.classList.toggle("open");
-});
+document
+  .getElementById("menuBtn")
+  ?.addEventListener("click", () => {
+    document
+      .getElementById("nav")
+      ?.classList.toggle("open");
+  });
 
 renderServices();
 renderGallery();
