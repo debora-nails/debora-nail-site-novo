@@ -325,23 +325,134 @@ document
   });
 
 document
-  .getElementById("loginBtn")
-  ?.addEventListener("click", () => {
-    showModal(`
-      <h2>Área VIP</h2>
+.getElementById("loginBtn")
+?.addEventListener("click", () => {
 
-      <p class="muted">
-        A área de cliente será conectada ao Supabase na próxima etapa.
-      </p>
+  window.vipLogin = async function () {
+    const email = document.getElementById("vipEmail")?.value.trim();
+    const password = document.getElementById("vipPassword")?.value;
 
-      <button
-        class="primary full"
-        onclick="closeModal()"
-      >
-        Entendi
-      </button>
-    `);
-  });
+    if (!email || !password) {
+      alert("Preencha seu e-mail e sua senha.");
+      return;
+    }
+
+    const client = window.supabase.createClient(
+      window.SUPABASE_CONFIG.url,
+      window.SUPABASE_CONFIG.publishableKey
+    );
+
+    const { error } = await client.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      alert("E-mail ou senha incorretos.");
+      return;
+    }
+
+    closeModal();
+    alert("Bem-vinda à sua Área VIP! 💗");
+  };
+
+  window.vipCadastro = async function () {
+    const nome = document.getElementById("vipNome")?.value.trim();
+    const whatsapp = document.getElementById("vipWhatsApp")?.value.trim();
+    const email = document.getElementById("vipEmailCadastro")?.value.trim();
+    const password = document.getElementById("vipPasswordCadastro")?.value;
+
+    if (!nome || !whatsapp || !email || !password) {
+      alert("Preencha todos os campos.");
+      return;
+    }
+
+    if (password.length < 6) {
+      alert("A senha precisa ter pelo menos 6 caracteres.");
+      return;
+    }
+
+    const client = window.supabase.createClient(
+      window.SUPABASE_CONFIG.url,
+      window.SUPABASE_CONFIG.publishableKey
+    );
+
+    const { data, error } = await client.auth.signUp({
+      email,
+      password
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    if (data.user && data.session) {
+      await client.from("Clientes").insert({
+        Nome: nome,
+        whatsapp: whatsapp,
+        email: email,
+        user_id: data.user.id
+      });
+    }
+
+    alert("Cadastro realizado com sucesso! 💗");
+    closeModal();
+  };
+
+  showModal(`
+    <h2>Área VIP</h2>
+
+    <p class="muted">
+      Entre na sua conta ou crie seu cadastro VIP.
+    </p>
+
+    <h3>Entrar</h3>
+
+    <label>
+      E-mail
+      <input id="vipEmail" type="email" placeholder="Seu e-mail">
+    </label>
+
+    <label>
+      Senha
+      <input id="vipPassword" type="password" placeholder="Sua senha">
+    </label>
+
+    <button class="primary full" onclick="vipLogin()">
+      ENTRAR NA ÁREA VIP
+    </button>
+
+    <hr>
+
+    <h3>Criar minha conta VIP</h3>
+
+    <label>
+      Nome
+      <input id="vipNome" type="text" placeholder="Seu nome">
+    </label>
+
+    <label>
+      WhatsApp
+      <input id="vipWhatsApp" type="tel" placeholder="Seu WhatsApp">
+    </label>
+
+    <label>
+      E-mail
+      <input id="vipEmailCadastro" type="email" placeholder="Seu e-mail">
+    </label>
+
+    <label>
+      Senha
+      <input id="vipPasswordCadastro" type="password" placeholder="Crie uma senha">
+    </label>
+
+    <button class="primary full" onclick="vipCadastro()">
+      CRIAR CONTA VIP
+    </button>
+  `);
+
+}); 
 
 document
   .getElementById("menuBtn")
