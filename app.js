@@ -421,7 +421,7 @@ document
   }
 
   // Atualiza o nome mostrado na Área VIP
-  const welcomeTitle = document.querySelector(".vip-welcome h2");
+  const welcomeTitle = document.getElementById("vipWelcomeTitle");
 
   if (welcomeTitle) {
     welcomeTitle.innerHTML =
