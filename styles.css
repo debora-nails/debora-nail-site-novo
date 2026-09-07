@@ -32,19 +32,20 @@ a {
 
 
 /* =========================
-   CABEÇALHO
+   HEADER
 ========================= */
 
 .header {
-  width: 100%;
   height: 82px;
+  width: 100%;
   padding: 0 4%;
-  background: #fffdfc;
-  border-bottom: 1px solid #ead9d8;
 
   display: flex;
   align-items: center;
   justify-content: space-between;
+
+  background: #fffdfb;
+  border-bottom: 1px solid #eadbd7;
 
   position: sticky;
   top: 0;
@@ -54,17 +55,17 @@ a {
 .logo {
   display: flex;
   flex-direction: column;
-  color: #b34d69;
+  color: #bd536c;
 }
 
 .logo span {
-  font-size: 31px;
+  font-size: 30px;
   font-style: italic;
   line-height: 1;
 }
 
 .logo small {
-  margin-top: 5px;
+  margin-top: 4px;
   margin-left: 4px;
 
   font-family: Arial, sans-serif;
@@ -75,38 +76,39 @@ a {
 .header nav {
   display: flex;
   align-items: center;
-  gap: 27px;
+  gap: 28px;
 
   font-family: Arial, sans-serif;
   font-size: 12px;
 }
 
 .header nav a {
+  padding: 30px 0;
   position: relative;
-  padding: 29px 0;
 }
 
 .header nav a:first-child {
-  color: #bd3f62;
+  color: #bf4160;
 }
 
 .header nav a:first-child::after {
   content: "";
   position: absolute;
-  bottom: 19px;
   left: 0;
   right: 0;
+  bottom: 19px;
   height: 2px;
-  background: #c94b6b;
+  background: #bf4160;
 }
 
 .vip-button {
-  border: none;
-  background: #c74668;
-  color: white;
+  border: 0;
+  border-radius: 8px;
 
   padding: 13px 22px;
-  border-radius: 8px;
+
+  background: #c54564;
+  color: #fff;
 
   font-family: Arial, sans-serif;
   font-size: 12px;
@@ -114,10 +116,10 @@ a {
 
 .menu-btn {
   display: none;
-  border: none;
+  border: 0;
   background: transparent;
+  color: #bd4864;
   font-size: 26px;
-  color: #b74766;
 }
 
 
@@ -126,26 +128,26 @@ a {
 ========================= */
 
 .hero {
+  width: 100%;
   min-height: 555px;
-  padding: 0 5%;
 
   display: grid;
   grid-template-columns: 43% 57%;
 
   background:
     radial-gradient(
-      circle at 10% 50%,
-      #f2d7cc 0,
-      #f8e5df 28%,
-      #f5deda 55%,
-      #e7c6ba 100%
+      circle at 15% 45%,
+      #f8e8e1 0%,
+      #f3ddd7 48%,
+      #e8c9bf 100%
     );
 
   overflow: hidden;
 }
 
 .hero-content {
-  padding: 62px 20px 45px 7%;
+  padding: 70px 35px 55px 8%;
+
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -155,77 +157,84 @@ a {
 }
 
 .eyebrow {
-  color: #c23e61;
+  margin-bottom: 10px;
+
+  color: #bd4563;
 
   font-family: Arial, sans-serif;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 600;
 
-  letter-spacing: 6px;
-  margin-bottom: 10px;
+  letter-spacing: 5px;
 }
 
 .hero h1 {
-  color: #c13d60;
-  font-size: clamp(58px, 6vw, 83px);
-  line-height: .88;
+  color: #bd3e5f;
+
+  font-size: clamp(58px, 6vw, 84px);
   font-weight: normal;
+  line-height: .9;
 }
 
 .hero h1 em {
   display: block;
 
-  margin-top: 18px;
+  margin-top: 16px;
 
-  color: #23171b;
-  font-size: .60em;
+  color: #24191d;
+
+  font-size: .55em;
   font-style: italic;
   font-weight: normal;
 }
 
 .hero-text {
-  max-width: 350px;
+  max-width: 340px;
+
   margin: 22px 0;
 
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.35;
 }
 
 .main-button {
   width: fit-content;
 
-  border: none;
+  padding: 14px 27px;
+
+  border: 0;
   border-radius: 30px;
 
-  background: #c94366;
-  color: white;
+  background: #c74466;
+  color: #fff;
 
-  padding: 15px 30px;
+  box-shadow: 0 8px 20px rgba(170, 58, 85, .18);
 
-  box-shadow: 0 8px 22px rgba(150, 48, 76, .18);
-
-  transition: .2s;
+  transition: transform .2s ease;
 }
 
 .main-button:hover {
   transform: translateY(-2px);
 }
 
+
+/* BENEFÍCIOS DO HERO */
+
 .hero-benefits {
   display: flex;
-  margin-top: 35px;
+  margin-top: 34px;
 }
 
 .hero-benefits div {
-  min-width: 125px;
+  min-width: 120px;
+
+  padding: 0 20px;
 
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 9px;
 
-  padding: 0 22px;
-
-  border-right: 1px solid rgba(100, 55, 55, .25);
+  border-right: 1px solid rgba(70, 40, 40, .22);
 }
 
 .hero-benefits div:first-child {
@@ -233,78 +242,82 @@ a {
 }
 
 .hero-benefits div:last-child {
-  border-right: none;
+  border-right: 0;
 }
 
 .hero-benefits span {
-  font-size: 30px;
-  color: #3b2228;
+  color: #382229;
+  font-size: 27px;
 }
 
 .hero-benefits strong {
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.2;
   font-weight: normal;
-  line-height: 1.25;
 }
 
 
-/* FOTOS DO HERO */
+/* =========================
+   AS 3 FOTOS DO HERO
+========================= */
 
 .hero-photo {
   height: 555px;
 
   display: grid;
 
-  grid-template-columns: 1.12fr .88fr;
+  grid-template-columns: 1.16fr .84fr;
   grid-template-rows: 1fr 1fr;
 
   gap: 7px;
 
-  padding: 0 0 0 10px;
+  overflow: hidden;
 }
 
 .hero-photo img {
   width: 100%;
   height: 100%;
 
-  object-fit: cover;
-
   display: block;
+
+  object-fit: cover;
 }
 
-.hero-photo img:first-child {
+.hero-photo img:nth-child(1) {
+  grid-column: 1;
   grid-row: 1 / 3;
-  border-radius: 0 0 0 0;
 }
 
 .hero-photo img:nth-child(2) {
-  border-radius: 0 0 0 0;
+  grid-column: 2;
+  grid-row: 1;
 }
 
 .hero-photo img:nth-child(3) {
-  border-radius: 0 0 0 0;
+  grid-column: 2;
+  grid-row: 2;
 }
 
 
 /* =========================
-   PAINEL VIP
+   ÁREA VIP
 ========================= */
 
 .vip-dashboard {
   width: min(1200px, 92%);
   margin: 0 auto;
 
-  padding: 38px 0 30px;
+  padding: 42px 0 30px;
 
   display: grid;
   grid-template-columns: 1.25fr 1fr 1fr 1fr;
-  gap: 13px;
+  gap: 14px;
 
-  background: #fffaf8;
+  background: #fff9f7;
 }
 
 .vip-intro {
-  padding: 15px 15px 15px 0;
+  padding: 14px 15px 14px 0;
 }
 
 .vip-intro h2 {
@@ -316,17 +329,18 @@ a {
 .vip-intro p:not(.eyebrow) {
   max-width: 300px;
   margin: 12px 0 20px;
+
   font-size: 15px;
 }
 
 .outline-button {
-  border: 1px solid #c54a68;
-  border-radius: 25px;
-
   padding: 10px 22px;
 
+  border: 1px solid #c24a67;
+  border-radius: 25px;
+
   background: transparent;
-  color: #b73d5f;
+  color: #b83f60;
 
   font-family: Arial, sans-serif;
   font-size: 12px;
@@ -346,7 +360,7 @@ a {
 
   background: #fff;
 
-  border: 1px solid #eadcda;
+  border: 1px solid #eadbd7;
   border-radius: 16px;
 
   box-shadow: 0 5px 20px rgba(70, 30, 35, .06);
@@ -354,23 +368,21 @@ a {
 
 .vip-card > span {
   font-family: Arial, sans-serif;
-  font-size: 11px;
+  font-size: 10px;
 }
 
 .vip-card strong {
-  display: block;
-
-  margin: 5px 0 12px;
+  margin: 4px 0 12px;
 
   font-size: 20px;
   font-weight: normal;
 }
 
 .vip-card button {
+  padding: 8px 17px;
+
   border: 1px solid #ead5d2;
   border-radius: 20px;
-
-  padding: 8px 17px;
 
   background: #fff4f0;
 
@@ -390,39 +402,40 @@ a {
   border-radius: 50%;
 
   background: #f4d6d3;
-  color: #b73f61;
+  color: #bd4563;
 
-  font-size: 32px;
+  font-size: 30px;
 }
 
 
 /* =========================
    QUATRO QUADRINHOS
+   FICAM ABAIXO DO VIP
 ========================= */
 
 .shortcut-grid {
   width: min(1200px, 92%);
-  margin: 0 auto 55px;
+  margin: 0 auto 58px;
 
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-
   gap: 14px;
 }
 
 .shortcut {
-  position: relative;
-
+  width: 100%;
   height: 275px;
-
-  overflow: hidden;
 
   padding: 0;
 
-  border: none;
+  position: relative;
+
+  overflow: hidden;
+
+  border: 0;
   border-radius: 17px;
 
-  background: #755b58;
+  background: #765c59;
 
   color: white;
 
@@ -432,11 +445,14 @@ a {
 .shortcut-image {
   position: absolute;
   inset: 0;
+  z-index: 0;
 }
 
 .shortcut-image img {
   width: 100%;
   height: 100%;
+
+  display: block;
 
   object-fit: cover;
 }
@@ -447,11 +463,12 @@ a {
   position: absolute;
   inset: 0;
 
-  background: linear-gradient(
-    to bottom,
-    rgba(20, 10, 12, .08),
-    rgba(20, 10, 12, .82)
-  );
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(25, 15, 18, .05),
+      rgba(25, 15, 18, .82)
+    );
 }
 
 .shortcut > div:last-child {
@@ -459,7 +476,7 @@ a {
   z-index: 2;
 
   left: 22px;
-  right: 15px;
+  right: 16px;
   bottom: 20px;
 }
 
@@ -468,8 +485,8 @@ a {
 
   margin-bottom: 4px;
 
-  color: #fff;
-  font-size: 31px;
+  color: white;
+  font-size: 28px;
 }
 
 .shortcut h3 {
@@ -482,7 +499,8 @@ a {
   margin-top: 8px;
 
   font-family: Arial, sans-serif;
-  font-size: 13px;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 
@@ -492,9 +510,9 @@ a {
 
 .benefits-section {
   width: min(1200px, 92%);
-  margin: 0 auto 65px;
+  margin: 0 auto 70px;
 
-  padding: 35px 40px;
+  padding: 34px 40px;
 
   display: grid;
   grid-template-columns: 1.45fr repeat(3, 1fr);
@@ -547,8 +565,8 @@ a {
   border: 1px solid #edc9ce;
   border-radius: 50%;
 
-  color: #db5272;
-  font-size: 27px;
+  color: #d55272;
+  font-size: 26px;
 }
 
 .benefit-item strong {
@@ -558,7 +576,7 @@ a {
 
 
 /* =========================
-   SOBRE
+   SOBRE MIM
 ========================= */
 
 .about-section {
@@ -576,6 +594,8 @@ a {
 .about-image img {
   width: 100%;
   height: 500px;
+
+  display: block;
 
   object-fit: cover;
 
@@ -631,7 +651,6 @@ a {
 
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-
   gap: 22px;
 }
 
@@ -659,9 +678,9 @@ a {
   width: 100%;
   height: 100%;
 
-  object-fit: cover;
-
   flex: 1;
+
+  object-fit: cover;
 }
 
 .service-content {
@@ -676,10 +695,10 @@ a {
 .service-content p {
   margin: 8px 0 18px;
 
+  color: #68595e;
+
   font-family: Arial, sans-serif;
   font-size: 13px;
-
-  color: #68595e;
 }
 
 .service-bottom {
@@ -713,18 +732,17 @@ a {
 
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-
   gap: 14px;
 }
 
 .gallery-grid figure {
   height: 270px;
 
+  margin: 0;
+
   overflow: hidden;
 
   position: relative;
-
-  margin: 0;
 
   border-radius: 17px;
 
@@ -735,9 +753,9 @@ a {
   width: 100%;
   height: 100%;
 
-  object-fit: cover;
-
   display: block;
+
+  object-fit: cover;
 
   transition: .3s;
 }
@@ -799,7 +817,6 @@ a {
 
   display: flex;
   flex-direction: column;
-
   gap: 12px;
 }
 
@@ -861,7 +878,6 @@ footer p {
 
 footer small {
   color: #bda9ae;
-
   font-family: Arial, sans-serif;
 }
 
@@ -961,7 +977,7 @@ footer small {
 
 
 /* =========================
-   CELULAR / TABLET
+   TABLET
 ========================= */
 
 @media (max-width: 1000px) {
@@ -975,11 +991,11 @@ footer small {
   }
 
   .hero-content {
-    padding-left: 3%;
+    padding-left: 5%;
   }
 
   .hero h1 {
-    font-size: 60px;
+    font-size: 58px;
   }
 
   .vip-dashboard {
@@ -1003,10 +1019,6 @@ footer small {
     margin-bottom: 20px;
   }
 
-  .benefit-item:nth-child(3) {
-    border-left: none;
-  }
-
   .services-grid {
     grid-template-columns: 1fr 1fr;
   }
@@ -1016,6 +1028,10 @@ footer small {
   }
 }
 
+
+/* =========================
+   CELULAR
+========================= */
 
 @media (max-width: 700px) {
 
@@ -1043,7 +1059,7 @@ footer small {
 
     flex-direction: column;
 
-    background: #fffdfc;
+    background: #fffdfb;
 
     border-bottom: 1px solid #ead9d8;
   }
@@ -1061,15 +1077,13 @@ footer small {
   }
 
   .hero {
-    min-height: auto;
-
     grid-template-columns: 1fr;
-
-    padding: 0;
+    min-height: auto;
   }
 
   .hero-content {
     padding: 55px 25px 35px;
+
     align-items: center;
     text-align: center;
   }
@@ -1095,11 +1109,13 @@ footer small {
   .hero-photo {
     height: 430px;
     padding: 0;
+
+    grid-template-columns: 1.16fr .84fr;
   }
 
   .vip-dashboard {
-    grid-template-columns: 1fr;
     width: 90%;
+    grid-template-columns: 1fr;
   }
 
   .vip-intro {
@@ -1107,13 +1123,13 @@ footer small {
   }
 
   .shortcut-grid {
-    grid-template-columns: 1fr;
     width: 90%;
+    grid-template-columns: 1fr;
   }
 
   .benefits-section {
-    grid-template-columns: 1fr;
     width: 90%;
+    grid-template-columns: 1fr;
     padding: 30px 20px;
   }
 
@@ -1127,8 +1143,8 @@ footer small {
   }
 
   .about-section {
-    grid-template-columns: 1fr;
     width: 90%;
+    grid-template-columns: 1fr;
     gap: 30px;
   }
 
@@ -1155,5 +1171,4 @@ footer small {
   .contact-actions {
     width: 100%;
   }
-
 }
