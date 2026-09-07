@@ -328,33 +328,126 @@ document
 .getElementById("loginBtn")
 ?.addEventListener("click", () => {
 
-  window.vipLogin = async function () {
-    const email = document.getElementById("vipEmail")?.value.trim();
-    const password = document.getElementById("vipPassword")?.value;
+ window.vipLogin = async function () {
+  const email = document.getElementById("vipEmail")?.value.trim();
+  const password = document.getElementById("vipPassword")?.value;
 
-    if (!email || !password) {
-      alert("Preencha seu e-mail e sua senha.");
+  if (!email || !password) {
+    alert("Preencha seu e-mail e sua senha.");
+    return;
+  }
+
+  const client = window.supabase.createClient(
+    window.SUPABASE_CONFIG.url,
+    window.SUPABASE_CONFIG.publishableKey
+  );
+
+  const { data, error } = await client.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error) {
+    alert("E-mail ou senha incorretos.");
+    return;
+  }
+
+  const user = data.user;
+
+  // Procura o cadastro da cliente
+  let { data: cliente, error: clienteError } = await client
+    .from("Clientes")
+    .select("id, Nome, whatsapp, email")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (clienteError) {
+    console.error(clienteError);
+    alert("Não foi possível carregar seus dados.");
+    return;
+  }
+
+  // Se a conta foi criada antes da confirmação de e-mail ser desligada,
+  // cria o cadastro na tabela Clientes agora.
+  if (!cliente) {
+    const nome = email.split("@")[0];
+
+    const { data: novoCliente, error: novoClienteError } = await client
+      .from("Clientes")
+      .insert({
+        Nome: nome,
+        whatsapp: "",
+        email: email,
+        user_id: user.id
+      })
+      .select("id, Nome, whatsapp, email")
+      .single();
+
+    if (novoClienteError) {
+      console.error(novoClienteError);
+      alert("Entrou na conta, mas não foi possível criar seu cadastro.");
       return;
     }
 
-    const client = window.supabase.createClient(
-      window.SUPABASE_CONFIG.url,
-      window.SUPABASE_CONFIG.publishableKey
-    );
+    cliente = novoCliente;
+  }
 
-    const { error } = await client.auth.signInWithPassword({
-      email,
-      password
-    });
+  // Procura os pontos VIP
+  let { data: vip, error: vipError } = await client
+    .from("vip_fidelidade")
+    .select("pontos, beneficio_usado, data_expiracao")
+    .eq("cliente_id", cliente.id)
+    .maybeSingle();
 
-    if (error) {
-      alert("E-mail ou senha incorretos.");
-      return;
+  if (vipError) {
+    console.error(vipError);
+  }
+
+  // Se ainda não tiver cartão VIP, cria com 0 pontos
+  if (!vip) {
+    const { data: novoVip, error: novoVipError } = await client
+      .from("vip_fidelidade")
+      .insert({
+        cliente_id: cliente.id,
+        pontos: 0,
+        beneficio_usado: false
+      })
+      .select("pontos, beneficio_usado, data_expiracao")
+      .single();
+
+    if (!novoVipError) {
+      vip = novoVip;
     }
+  }
 
-    closeModal();
-    alert("Bem-vinda à sua Área VIP! 💗");
-  };
+  // Atualiza o nome mostrado na Área VIP
+  const welcomeTitle = document.querySelector(".vip-welcome h2");
+
+  if (welcomeTitle) {
+    welcomeTitle.innerHTML =
+      `Olá, ${cliente.Nome || "Cliente VIP"}! 💝`;
+  }
+
+  // Atualiza os pontos mostrados no painel
+  const vipStats = document.querySelectorAll(".vip-stat");
+
+  if (vipStats[1]) {
+    const points = vip?.pontos || 0;
+    const pointsText = vipStats[1].querySelector("strong");
+
+    if (pointsText) {
+      pointsText.textContent = `${points} pts`;
+    }
+  }
+
+  closeModal();
+
+  document.querySelector("#vip")?.scrollIntoView({
+    behavior: "smooth"
+  });
+
+  alert("Bem-vinda à sua Área VIP! 💗");
+}; 
 
   window.vipCadastro = async function () {
     const nome = document.getElementById("vipNome")?.value.trim();
