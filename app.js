@@ -1162,16 +1162,18 @@ carregarPrecosPublicos();
 // O botão "ENTRAR NA ÁREA VIP" da abertura deve abrir login/cadastro,
 // nunca o formulário de agendamento.
 function corrigirEntradaAreaVIP() {
-  document.addEventListener("click", event => {
-    const alvo = event.target.closest("button, a, [role='button']");
-    if (!alvo) return;
-    const texto = (alvo.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-    if (texto.includes("entrar na área vip")) {
+  // Corrige somente o botão da entrada principal (#loginBtn).
+  // Não intercepta o botão "ENTRAR NA ÁREA VIP" que existe dentro do próprio modal,
+  // pois esse botão precisa executar vipLogin().
+  const botaoEntrada = document.getElementById("loginBtn");
+  if (botaoEntrada) {
+    botaoEntrada.onclick = function (event) {
       event.preventDefault();
-      event.stopImmediatePropagation();
+      event.stopPropagation();
       openVipModal();
-    }
-  }, true);
+      return false;
+    };
+  }
 }
 
 // Mostra os dados reais da cliente logada no botão MEUS DADOS.
