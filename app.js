@@ -818,6 +818,7 @@ function adminBotoes() {
       <button class="primary small" onclick="abrirAdminAba('promocoes')">🎀 Promoções</button>
       <button class="primary small" onclick="abrirAdminAba('vip')">⭐ VIP Fidelidade</button>
       <button class="primary small" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
+      <button class="primary small" data-admin-aba="financeiro" onclick="abrirAdminAba('financeiro')">💰 Financeiro</button>
       <button class="primary small" data-admin-aba="avisos" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
     </div>
   `;
@@ -1179,26 +1180,190 @@ async function renderAdminAvisos() {
 async function renderAdminAgendamentos() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
-  conteudo.innerHTML = `<h3>📋 Agendamentos</h3><div id="listaAgendamentosAdmin">Carregando...</div>`;
+  conteudo.innerHTML = `<h3>📋 Agendamentos</h3><p class="muted">Acompanhe os horários e registre o resultado de cada atendimento.</p><div id="listaAgendamentosAdmin">Carregando...</div>`;
   const client = adminClient();
   const { data, error } = await client.from("agendamentos").select("id,cliente_id,servico,data,horario,status,forma_pagamento,troco_para,troco,pagamento_status").order("data", {ascending:false}).order("horario", {ascending:false});
   if (error) { document.getElementById("listaAgendamentosAdmin").textContent = "Não foi possível carregar os agendamentos."; return; }
   const ids = [...new Set((data || []).map(a => a.cliente_id).filter(Boolean))];
   let clientes = [];
-  if (ids.length) {
-    const r = await client.from("Clientes").select("id,nome,whatsapp").in("id", ids);
-    clientes = r.data || [];
-  }
+  if (ids.length) { const r = await client.from("Clientes").select("id,nome,whatsapp").in("id", ids); clientes = r.data || []; }
   const cm = new Map(clientes.map(c => [c.id, c]));
+  const pagamentos = {pix:"Pix",dinheiro:"Dinheiro",debito:"Cartão de débito",credito:"Cartão de crédito",pagar_depois:"Pagar depois"};
+  const statusLabel = s => ({confirmado:"Confirmado",agendado:"Agendado",realizado:"Realizado",cancelado:"Cancelado",faltou:"Faltou"}[String(s||"").toLowerCase()] || s || "Agendado");
   document.getElementById("listaAgendamentosAdmin").innerHTML = (data || []).map(a => {
     const c = cm.get(a.cliente_id);
-    const pagamentos = {pix:"Pix",dinheiro:"Dinheiro",debito:"Cartão de débito",credito:"Cartão de crédito",pagar_depois:"Pagar depois"};
     const pagamento = pagamentos[a.forma_pagamento] || "Não informado";
     const trocoInfo = a.forma_pagamento === "dinheiro" && a.troco_para ? `<br>Troco para: ${money(a.troco_para)}${a.troco != null ? ` — Troco: ${money(a.troco)}` : ""}` : "";
-    return `<div style="padding:12px;border-bottom:1px solid #eee;"><strong>${a.data} — ${String(a.horario).slice(0,5)}</strong><br>${a.servico}<br>${c?.nome || "Cliente"} ${c?.whatsapp ? "— "+c.whatsapp : ""}<br>Status: ${a.status || ""}<br>Pagamento: ${pagamento} — ${a.pagamento_status || "pendente"}${trocoInfo}</div>`;
+    const podeFechar = !["cancelado","faltou"].includes(String(a.status||"").toLowerCase());
+    return `<div style="padding:14px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
+      <strong>📅 ${a.data} — ${String(a.horario).slice(0,5)}</strong>
+      <div style="margin-top:6px;">💅 ${escapeHtml(a.servico)}</div>
+      <div>👤 ${escapeHtml(c?.nome || "Cliente")} ${c?.whatsapp ? `— ${escapeHtml(c.whatsapp)}` : ""}</div>
+      <div>Status: <strong>${escapeHtml(statusLabel(a.status))}</strong></div>
+      <div>Pagamento: ${escapeHtml(pagamento)} — ${escapeHtml(a.pagamento_status || "pendente")}${trocoInfo}</div>
+      ${podeFechar ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
+        <button class="primary small" onclick="adminMarcarAgendamento(${a.id},'realizado')">✅ Realizado</button>
+        <button class="secondary small" onclick="adminMarcarAgendamento(${a.id},'faltou')">⚠️ Faltou</button>
+        <button class="secondary small" onclick="adminMarcarAgendamento(${a.id},'cancelado')">❌ Cancelar</button>
+      </div>` : ""}
+    </div>`;
   }).join("") || "Nenhum agendamento cadastrado.";
 }
 
+window.adminMarcarAgendamento = async function(id, status) {
+  const nomes = {realizado:"concluir este atendimento como realizado", faltou:"marcar este atendimento como falta", cancelado:"cancelar este agendamento"};
+  if (!confirm(`Deseja ${nomes[status] || "alterar o status"}?`)) return;
+  const client = adminClient();
+  const { error } = await client.from("agendamentos").update({ status }).eq("id", id);
+  if (error) { console.error(error); return alert("Não foi possível atualizar o agendamento."); }
+  if (status === "realizado") {
+    const { data: a } = await client.from("agendamentos").select("id,cliente_id,servico,data,forma_pagamento,pagamento_status").eq("id", id).single();
+    if (a && a.forma_pagamento !== "pagar_depois") {
+      await client.from("entradas_financeiro").upsert({
+        agendamento_id:a.id, cliente_id:a.cliente_id, servico:a.servico, data:a.data, valor:precoAtualServico(a.servico), forma_pagamento:a.forma_pagamento, desconto:0, status:"pago"
+      }, {onConflict:"agendamento_id"});
+      await client.from("agendamentos").update({pagamento_status:"pago"}).eq("id", id);
+    } else if (a) {
+      const valor = precoAtualServico(a.servico);
+      await client.from("contas_receber").upsert({agendamento_id:a.id, cliente_id:a.cliente_id, valor_original:valor, valor_pago:0, saldo:valor, data_vencimento:null, status:"pendente"}, {onConflict:"agendamento_id"});
+    }
+  }
+  renderAdminAgendamentos();
+};
+
+
+// ===== FINANCEIRO =====
+function finMoney(v){ return money(Number(v||0)); }
+function finDate(v){ return v ? String(v).split("-").reverse().join("/") : ""; }
+function finToday(){ return new Date().toISOString().slice(0,10); }
+
+async function renderAdminFinanceiro() {
+  const conteudo=document.getElementById("adminConteudo");
+  if(!conteudo) return;
+  conteudo.innerHTML=`
+    <h3>💰 Financeiro</h3>
+    <p class="muted">Controle suas entradas, despesas, valores a receber e lucro sem alterar os outros módulos.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin:12px 0;">
+      <button class="primary small" onclick="finMostrarResumo()">📊 Resumo</button>
+      <button class="primary small" onclick="finMostrarEntradas()">💗 Entradas</button>
+      <button class="primary small" onclick="finMostrarDespesas()">💸 Despesas</button>
+      <button class="primary small" onclick="finMostrarReceber()">📌 A receber</button>
+      <button class="primary small" onclick="finMostrarRelatorios()">📈 Relatórios</button>
+      <button class="primary small" onclick="finMostrarMeta()">🎯 Meta</button>
+      <button class="primary small" onclick="finMostrarFechamento()">🔒 Fechamento</button>
+      <button class="primary small" onclick="finMostrarHistorico()">📚 Histórico</button>
+    </div>
+    <div id="financeiroConteudo">Carregando...</div>`;
+  await finMostrarResumo();
+}
+
+function finPeriodo(tipo){
+  const hoje=new Date(); const y=hoje.getFullYear(); const m=hoje.getMonth();
+  if(tipo==='hoje') return [finToday(),finToday()];
+  if(tipo==='ontem'){ const d=new Date(hoje); d.setDate(d.getDate()-1); const x=d.toISOString().slice(0,10); return [x,x]; }
+  if(tipo==='semana'){ const d=new Date(hoje); const day=d.getDay()||7; d.setDate(d.getDate()-day+1); const ini=d.toISOString().slice(0,10); const f=new Date(d); f.setDate(f.getDate()+6); return [ini,f.toISOString().slice(0,10)]; }
+  if(tipo==='mespassado'){ const ini=new Date(y,m-1,1), fim=new Date(y,m,0); return [ini.toISOString().slice(0,10),fim.toISOString().slice(0,10)]; }
+  if(tipo==='ano'){ return [`${y}-01-01`,`${y}-12-31`]; }
+  return [new Date(y,m,1).toISOString().slice(0,10),new Date(y,m+1,0).toISOString().slice(0,10)];
+}
+
+async function finDados(tipo='mes'){
+  const client=adminClient(), [ini,fim]=finPeriodo(tipo);
+  const [e,d]=await Promise.all([
+    client.from('entradas_financeiro').select('*').gte('data',ini).lte('data',fim).order('data',{ascending:false}),
+    client.from('despesas_financeiro').select('*').gte('data',ini).lte('data',fim).order('data',{ascending:false})
+  ]);
+  return {entradas:e.data||[],despesas:d.data||[],ini,fim};
+}
+
+async function finMostrarResumo(tipo='mes'){
+  const box=document.getElementById('financeiroConteudo'); if(!box) return;
+  box.innerHTML='Carregando resumo...';
+  const r=await finDados(tipo);
+  const ent=r.entradas.reduce((s,x)=>s+Number(x.valor||0),0), desp=r.despesas.reduce((s,x)=>s+Number(x.valor||0),0);
+  box.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">${['hoje','ontem','semana','mes','mespassado','ano'].map(x=>`<button class="secondary small" onclick="finMostrarResumo('${x}')">${({hoje:'Hoje',ontem:'Ontem',semana:'Esta semana',mes:'Este mês',mespassado:'Mês passado',ano:'Este ano'})[x]}</button>`).join('')}</div>
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">
+    <div class="vip-card"><small>Entradas</small><h3>${finMoney(ent)}</h3></div>
+    <div class="vip-card"><small>Despesas</small><h3>${finMoney(desp)}</h3></div>
+    <div class="vip-card"><small>Lucro</small><h3>${finMoney(ent-desp)}</h3></div>
+    <div class="vip-card"><small>Atendimentos pagos</small><h3>${r.entradas.length}</h3></div>
+  </div>
+  <div style="margin-top:16px;padding:14px;border:1px solid #ead7df;border-radius:16px;">
+    <strong>Período</strong><br>${finDate(r.ini)} até ${finDate(r.fim)}<br><small>Ticket médio: ${finMoney(r.entradas.length?ent/r.entradas.length:0)}</small>
+  </div>`;
+}
+
+async function finMostrarEntradas(){
+  const box=document.getElementById('financeiroConteudo'); if(!box)return;
+  const client=adminClient(); const {data}=await client.from('entradas_financeiro').select('*').order('data',{ascending:false}).order('id',{ascending:false});
+  box.innerHTML=`<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;"><h4>💗 Entradas</h4><button class="primary small" onclick="finNovaEntrada()">+ Nova entrada</button></div><div>${(data||[]).map(x=>`<div style="padding:12px;border-bottom:1px solid #eee;"><strong>${finDate(x.data)} — ${finMoney(x.valor)}</strong><br>${escapeHtml(x.cliente_nome||x.servico||'Entrada')} · ${escapeHtml(x.forma_pagamento||'Não informado')}<br><small>${escapeHtml(x.observacoes||'')}</small><br><button class="secondary small" style="margin-top:6px;" onclick="finRegistrarEstorno(${x.id})">↩️ Estornar</button></div>`).join('')||'<p>Nenhuma entrada registrada.</p>'}</div>`;
+}
+
+window.finNovaEntrada=async function(){
+  const nome=prompt('Nome da cliente (opcional):')||''; const serv=prompt('Descrição/serviço:'); if(!serv)return; const valor=Number((prompt('Valor:')||'').replace(',','.')); if(!Number.isFinite(valor)||valor<0)return alert('Valor inválido.'); const forma=prompt('Forma de pagamento: pix, dinheiro, debito ou credito')||'pix';
+  const client=adminClient(); const {error}=await client.from('entradas_financeiro').insert({cliente_nome:nome,servico:serv,data:finToday(),valor,forma_pagamento:forma,status:'pago'}); if(error){console.error(error);return alert('Não foi possível registrar a entrada.');} finMostrarEntradas();
+};
+
+async function finMostrarDespesas(){
+  const box=document.getElementById('financeiroConteudo'); if(!box)return; const client=adminClient(); const {data}=await client.from('despesas_financeiro').select('*').order('data',{ascending:false}).order('id',{ascending:false});
+  box.innerHTML=`<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;"><h4>💸 Despesas</h4><button class="primary small" onclick="finNovaDespesa()">+ Nova despesa</button></div><div>${(data||[]).map(x=>`<div style="padding:12px;border-bottom:1px solid #eee;"><strong>${finDate(x.data)} — ${finMoney(x.valor)}</strong><br>${escapeHtml(x.categoria||'Outros')} · ${escapeHtml(x.descricao||'')}</div>`).join('')||'<p>Nenhuma despesa registrada.</p>'}</div>`;
+}
+
+window.finNovaDespesa=async function(){
+  const categoria=prompt('Categoria: materiais, produtos, móveis/equipamentos, energia, água, internet/telefone, aluguel, marketing, compras ou outros')||'outros'; const descricao=prompt('Descrição:')||''; const valor=Number((prompt('Valor:')||'').replace(',','.')); if(!Number.isFinite(valor)||valor<0)return alert('Valor inválido.'); const data=prompt('Data (AAAA-MM-DD):',finToday())||finToday();
+  const client=adminClient(); const {error}=await client.from('despesas_financeiro').insert({data,categoria,descricao,valor}); if(error){console.error(error);return alert('Não foi possível registrar a despesa.');} finMostrarDespesas();
+};
+
+async function finMostrarReceber(){
+  const box=document.getElementById('financeiroConteudo'); if(!box)return; const client=adminClient(); const {data}=await client.from('contas_receber').select('*').order('status').order('data_vencimento'); const ids=[...new Set((data||[]).map(x=>x.cliente_id).filter(Boolean))]; let cs=[]; if(ids.length){const r=await client.from('Clientes').select('id,nome,whatsapp').in('id',ids);cs=r.data||[];} const cm=new Map(cs.map(c=>[c.id,c]));
+  box.innerHTML=`<h4>📌 Contas a receber</h4>${(data||[]).map(x=>{const c=cm.get(x.cliente_id);return `<div style="padding:14px;border:1px solid #ead7df;border-radius:14px;margin:8px 0;"><strong>${escapeHtml(c?.nome||'Cliente')}</strong><br>Valor: ${finMoney(x.valor_original)} · Pago: ${finMoney(x.valor_pago)} · <strong>Falta: ${finMoney(x.saldo)}</strong><br>Vencimento: ${x.data_vencimento?finDate(x.data_vencimento):'A combinar'}<br>Status: ${escapeHtml(x.status)}<div style="margin-top:8px;display:flex;gap:7px;flex-wrap:wrap;"><button class="primary small" onclick="finRegistrarPagamento(${x.id})">+ Registrar pagamento</button><button class="secondary small" onclick="finDefinirVencimento(${x.id})">📅 Definir vencimento</button><button class="secondary small" onclick="finHistoricoConta(${x.id})">📜 Histórico</button></div></div>`}).join('')||'<p>Ninguém está devendo no momento. 💗</p>'}`;
+}
+
+window.finRegistrarPagamento=async function(id){
+  const valor=Number((prompt('Valor pago agora:')||'').replace(',','.')); if(!Number.isFinite(valor)||valor<=0)return alert('Valor inválido.'); const forma=prompt('Forma de pagamento: pix, dinheiro, debito ou credito')||'pix'; const data=prompt('Data (AAAA-MM-DD):',finToday())||finToday(); const obs=prompt('Observação (opcional):')||''; const client=adminClient();
+  const {data:r,error:e}=await client.from('contas_receber').select('*').eq('id',id).single(); if(e||!r)return alert('Conta não encontrada.'); if(valor>Number(r.saldo))return alert('O pagamento não pode ser maior que o saldo.');
+  const {error}=await client.from('pagamentos_receber').insert({conta_receber_id:id,data,valor,forma_pagamento:forma,observacoes:obs}); if(error){console.error(error);return alert('Não foi possível registrar o pagamento.');}
+  const novoPago=Number(r.valor_pago||0)+valor, novoSaldo=Number(r.valor_original)-novoPago; await client.from('contas_receber').update({valor_pago:novoPago,saldo:novoSaldo,status:novoSaldo<=0?'pago':'parcial'}).eq('id',id);
+  if(novoSaldo<=0 && r.agendamento_id) await client.from('agendamentos').update({pagamento_status:'pago'}).eq('id',r.agendamento_id);
+  await client.from('entradas_financeiro').insert({agendamento_id:r.agendamento_id||null,cliente_id:r.cliente_id,servico:r.servico||'Pagamento de dívida',data,valor,forma_pagamento:forma,desconto:0,status:'pago',observacoes:obs});
+  finMostrarReceber();
+};
+
+async function finDefinirVencimento(id){
+  const data=prompt('Data combinada para pagamento (AAAA-MM-DD):'); if(!data)return;
+  const client=adminClient(); const {error}=await client.from('contas_receber').update({data_vencimento:data}).eq('id',id); if(error){console.error(error);return alert('Não foi possível salvar a data.');} finMostrarReceber();
+}
+
+async function finHistoricoConta(id){
+  const client=adminClient(); const {data,error}=await client.from('pagamentos_receber').select('*').eq('conta_receber_id',id).order('data',{ascending:true}).order('id',{ascending:true});
+  if(error)return alert('Não foi possível carregar o histórico.');
+  alert((data||[]).length ? (data||[]).map(x=>`${finDate(x.data)} — ${finMoney(x.valor)} — ${x.forma_pagamento||'Não informado'}${x.observacoes?' — '+x.observacoes:''}`).join('\n') : 'Nenhum pagamento registrado ainda.');
+}
+
+async function finMostrarMeta(){
+  const box=document.getElementById('financeiroConteudo'); if(!box)return; const mes=new Date(); const chave=`${mes.getFullYear()}-${String(mes.getMonth()+1).padStart(2,'0')}-01`; const client=adminClient(); const {data}=await client.from('metas_financeiras').select('*').eq('mes',chave).maybeSingle(); const r=await finDados('mes'); const atual=r.entradas.reduce((s,x)=>s+Number(x.valor||0),0); const meta=Number(data?.valor_meta||0); const pct=meta>0?Math.min(100,(atual/meta)*100):0;
+  box.innerHTML=`<h4>🎯 Meta mensal</h4><p>Faturamento deste mês: <strong>${finMoney(atual)}</strong></p><p>Meta: <strong>${finMoney(meta)}</strong></p><div style="height:12px;border-radius:99px;background:#f0e1e7;overflow:hidden;"><div style="width:${pct}%;height:100%;background:#d65f7b;"></div></div><p>${pct.toFixed(0)}% da meta</p><button class="primary small" onclick="finDefinirMeta()">Definir / alterar meta</button>`;
+}
+
+window.finDefinirMeta=async function(){ const valor=Number((prompt('Qual a meta de faturamento deste mês?')||'').replace(',','.')); if(!Number.isFinite(valor)||valor<0)return alert('Valor inválido.'); const d=new Date(); const mes=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`; const client=adminClient(); const {error}=await client.from('metas_financeiras').upsert({mes,valor_meta:valor},{onConflict:'mes'}); if(error){console.error(error);return alert('Não foi possível salvar a meta.');} finMostrarMeta(); };
+
+async function finMostrarFechamento(){
+  const box=document.getElementById('financeiroConteudo'); if(!box)return; const d=new Date(); const mes=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`; const client=adminClient(); const {data}=await client.from('fechamentos_financeiros').select('*').eq('mes',mes).maybeSingle(); box.innerHTML=`<h4>🔒 Fechamento mensal</h4><p>Mês atual: ${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}</p><p>Status: <strong>${data?.fechado?'Fechado':'Aberto'}</strong></p><button class="primary small" onclick="finAlternarFechamento()">${data?.fechado?'Reabrir mês':'Fechar mês'}</button><p class="muted">O fechamento é um registro de conferência; os dados financeiros não são apagados.</p>`;
+}
+
+window.finAlternarFechamento=async function(){ const d=new Date(); const mes=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`; const client=adminClient(); const {data}=await client.from('fechamentos_financeiros').select('*').eq('mes',mes).maybeSingle(); const fechado=!data?.fechado; const {error}=await client.from('fechamentos_financeiros').upsert({mes,fechado,fechado_em:fechado?new Date().toISOString():null},{onConflict:'mes'}); if(error){console.error(error);return alert('Não foi possível atualizar o fechamento.');} finMostrarFechamento(); };
+
+async function finMostrarHistorico(){ const box=document.getElementById('financeiroConteudo'); if(!box)return; const client=adminClient(); const [e,d,est]=await Promise.all([client.from('entradas_financeiro').select('*').order('data',{ascending:false}).order('id',{ascending:false}),client.from('despesas_financeiro').select('*').order('data',{ascending:false}).order('id',{ascending:false}),client.from('estornos_financeiros').select('*').order('data',{ascending:false}).order('id',{ascending:false})]); const rows=[...(e.data||[]).map(x=>({data:x.data,tipo:'Entrada',desc:x.servico||x.cliente_nome||'Entrada',valor:Number(x.valor)})),...(d.data||[]).map(x=>({data:x.data,tipo:'Despesa',desc:x.descricao||x.categoria,valor:-Number(x.valor)})),...(est.data||[]).map(x=>({data:x.data,tipo:'Estorno',desc:x.motivo||'Estorno',valor:-Number(x.valor)}))].sort((a,b)=>String(b.data).localeCompare(String(a.data))); box.innerHTML=`<h4>📚 Histórico financeiro</h4><button class="secondary small" onclick="finExportarCSV()">⬇️ Exportar CSV</button><div style="margin-top:10px;">${rows.map(x=>`<div style="padding:10px;border-bottom:1px solid #eee;"><strong>${finDate(x.data)}</strong> · ${escapeHtml(x.tipo)} · ${escapeHtml(x.desc)} · <strong>${finMoney(x.valor)}</strong></div>`).join('')||'<p>Nenhum lançamento.</p>'}</div>`; }
+
+window.finExportarCSV=async function(){ const client=adminClient(); const [e,d]=await Promise.all([client.from('entradas_financeiro').select('*').order('data'),client.from('despesas_financeiro').select('*').order('data')]); const rows=[['Data','Tipo','Descrição','Valor','Forma de pagamento'],...(e.data||[]).map(x=>[x.data,'Entrada',x.servico||x.cliente_nome||'',x.valor,x.forma_pagamento||'']),...(d.data||[]).map(x=>[x.data,'Despesa',x.descricao||x.categoria||'',-Number(x.valor), ''])]; const csv=rows.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n'); const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`financeiro-debora-nail-${finToday()}.csv`; a.click(); URL.revokeObjectURL(a.href); };
+
+window.finRegistrarEstorno=async function(entradaId){ const valor=Number((prompt('Valor do estorno:')||'').replace(',','.')); if(!Number.isFinite(valor)||valor<=0)return alert('Valor inválido.'); const motivo=prompt('Motivo do estorno:')||''; const client=adminClient(); const {data:e}=await client.from('entradas_financeiro').select('*').eq('id',entradaId).single(); if(!e)return alert('Entrada não encontrada.'); const {error}=await client.from('estornos_financeiros').insert({entrada_id:entradaId,cliente_id:e.cliente_id,data:finToday(),valor,motivo}); if(error){console.error(error);return alert('Não foi possível registrar o estorno.');} alert('Estorno registrado no histórico.'); };
+
+async function finMostrarRelatorios(){
+  const box=document.getElementById('financeiroConteudo'); if(!box)return; const r=await finDados('ano'); const porForma={}; const porServico={}; const porCat={}; r.entradas.forEach(x=>{porForma[x.forma_pagamento]=(porForma[x.forma_pagamento]||0)+Number(x.valor||0); porServico[x.servico||'Outros']=(porServico[x.servico||'Outros']||0)+Number(x.valor||0);}); r.despesas.forEach(x=>porCat[x.categoria||'Outros']=(porCat[x.categoria||'Outros']||0)+Number(x.valor||0));
+  const lista=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<li>${escapeHtml(k)} — <strong>${finMoney(v)}</strong></li>`).join('')||'<li>Nenhum dado.</li>';
+  box.innerHTML=`<h4>📈 Relatórios do ano</h4><p><strong>Faturamento:</strong> ${finMoney(r.entradas.reduce((s,x)=>s+Number(x.valor||0),0))}</p><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;"><div><strong>Por forma de pagamento</strong><ul>${lista(porForma)}</ul></div><div><strong>Por serviço</strong><ul>${lista(porServico)}</ul></div><div><strong>Despesas por categoria</strong><ul>${lista(porCat)}</ul></div></div>`;
+}
 window.abrirAdminAba = async function (aba) {
   const resultado = await verificarAdmin();
   if (!resultado.ok) { alert(resultado.message); return; }
@@ -1206,7 +1371,7 @@ window.abrirAdminAba = async function (aba) {
   if (area) area.style.display = "block";
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
-  const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", agendamentos:"📋 Agendamentos", avisos:"📢 Avisos e Novidades" };
+  const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", agendamentos:"📋 Agendamentos", financeiro:"💰 Financeiro", avisos:"📢 Avisos e Novidades" };
   const container = area.querySelector(".admin-container") || area;
   const atual = document.getElementById("adminConteudo");
   let tabs = container.querySelector(".admin-tabs");
@@ -1236,7 +1401,7 @@ window.abrirAdminAba = async function (aba) {
     atual.id = "adminConteudo";
     container.appendChild(atual);
   }
-  const carregadores = { horarios:renderAdminHorarios, precos:renderAdminPrecos, fotos:renderAdminFotos, promocoes:renderAdminPromocoes, vip:renderAdminVip, agendamentos:renderAdminAgendamentos, avisos:renderAdminAvisos };
+  const carregadores = { horarios:renderAdminHorarios, precos:renderAdminPrecos, fotos:renderAdminFotos, promocoes:renderAdminPromocoes, vip:renderAdminVip, agendamentos:renderAdminAgendamentos, financeiro:renderAdminFinanceiro, avisos:renderAdminAvisos };
   await (carregadores[aba] || renderAdminHorarios)();
 };
 
