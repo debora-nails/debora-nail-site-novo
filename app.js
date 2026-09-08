@@ -1029,9 +1029,11 @@ async function renderAdminAvisos() {
     <h3>📢 Avisos e Novidades</h3>
     <p>Escreva aqui o que você quer mostrar para suas clientes na Área VIP.</p>
     <div style="display:grid;gap:10px;max-width:760px;">
-      <input id="adminAvisoTitulo" type="text" placeholder="Título do aviso">
-      <textarea id="adminAvisoMensagem" rows="5" placeholder="Escreva seu aviso ou novidade..."></textarea>
-      <button class="primary small" onclick="adminAdicionarAviso()">📢 Publicar aviso</button>
+      <label for="adminAvisoTitulo">Título</label>
+      <input id="adminAvisoTitulo" type="text" placeholder="Digite o título">
+      <label for="adminAvisoMensagem">Mensagem</label>
+      <textarea id="adminAvisoMensagem" rows="5" placeholder="Digite a mensagem"></textarea>
+      <button class="primary small" onclick="adminAdicionarAviso()">📢 Publicar</button>
     </div>
     <div id="listaAvisosAdmin" style="margin-top:18px">Carregando...</div>
   `;
