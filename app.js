@@ -135,6 +135,16 @@ const money = value =>
     currency: "BRL"
   });
 
+function precoAtualServico(nome) {
+  const base = SERVICES.find(s => String(s[0]).trim().toLowerCase() === String(nome).trim().toLowerCase());
+  const precoBase = Number(base?.[1] || 0);
+  const promo = PROMOCOES_ATIVAS.find(p =>
+    String(p.servico || "").trim().toLowerCase() === String(nome).trim().toLowerCase()
+  );
+  const precoPromo = Number(promo?.preco_promocional);
+  return Number.isFinite(precoPromo) && precoPromo >= 0 && precoPromo < precoBase ? precoPromo : precoBase;
+}
+
 function renderServices() {
   if (!grid) return;
 
@@ -232,7 +242,7 @@ async function getCurrentClient() {
   if (!user) return { client, user: null, cliente: null };
   const { data: cliente, error } = await client
     .from("Clientes")
-    .select("id, nome, whatsapp, email, is_admin")
+    .select("id, nome, whatsapp, email, is_admin, permite_pagamento_posterior")
     .eq("user_id", user.id)
     .maybeSingle();
   return { client, user, cliente, error };
@@ -331,6 +341,28 @@ async function openBooking(index = null) {
 
     <p id="bookingTimeStatus" class="muted"></p>
 
+    <label>
+      Forma de pagamento
+      <select id="bookingPayment" onchange="atualizarPagamentoAgendamento()">
+        <option value="">Selecione</option>
+        <option value="pix">Pix</option>
+        <option value="dinheiro">Dinheiro</option>
+        <option value="debito">Cartão de débito</option>
+        <option value="credito">Cartão de crédito</option>
+        <option value="pagar_depois" id="bookingPayLaterOption" style="display:none">Pagar depois</option>
+      </select>
+    </label>
+
+    <div id="bookingCashBox" style="display:none;">
+      <label>
+        Troco para quanto?
+        <input id="bookingTrocoPara" type="number" min="0" step="0.01" placeholder="Ex.: 200,00" oninput="calcularTrocoAgendamento()">
+      </label>
+      <p id="bookingTrocoResultado" class="muted"></p>
+    </div>
+
+    <p id="bookingPaymentStatus" class="muted"></p>
+
     <button class="primary full" onclick="confirmarAgendamento()">
       AGENDAR HORÁRIO
     </button>
@@ -339,22 +371,88 @@ async function openBooking(index = null) {
       CONTINUAR PELO WHATSAPP
     </button>
   `);
+
+  await atualizarOpcaoPagarDepoisAgendamento();
+  atualizarPagamentoAgendamento();
+}
+
+async function atualizarOpcaoPagarDepoisAgendamento() {
+  const option = document.getElementById("bookingPayLaterOption");
+  if (!option) return;
+  const { cliente } = await getCurrentClient();
+  const permitido = !!cliente?.permite_pagamento_posterior;
+  option.style.display = permitido ? "block" : "none";
+  option.disabled = !permitido;
+  if (!permitido && document.getElementById("bookingPayment")?.value === "pagar_depois") {
+    document.getElementById("bookingPayment").value = "";
+  }
+}
+
+function atualizarPagamentoAgendamento() {
+  const payment = document.getElementById("bookingPayment")?.value;
+  const cashBox = document.getElementById("bookingCashBox");
+  const status = document.getElementById("bookingPaymentStatus");
+  if (cashBox) cashBox.style.display = payment === "dinheiro" ? "block" : "none";
+  if (status) status.textContent = payment === "pagar_depois" ? "Este atendimento ficará registrado como valor a receber." : "";
+  if (payment !== "dinheiro") {
+    const input = document.getElementById("bookingTrocoPara");
+    const result = document.getElementById("bookingTrocoResultado");
+    if (input) input.value = "";
+    if (result) result.textContent = "";
+  }
+}
+
+function calcularTrocoAgendamento() {
+  const service = document.getElementById("bookingService")?.value;
+  const trocoPara = Number(document.getElementById("bookingTrocoPara")?.value || 0);
+  const result = document.getElementById("bookingTrocoResultado");
+  const servicoAtual = SERVICES.find(s => s[0] === service);
+  if (!result || !servicoAtual || !trocoPara) { if (result) result.textContent = ""; return; }
+  const valor = precoAtualServico(service);
+  if (trocoPara < valor) {
+    result.textContent = `O valor informado é menor que o serviço (${money(valor)}).`;
+    return;
+  }
+  result.textContent = `Troco: ${money(trocoPara - valor)}`;
 }
 
 async function confirmarAgendamento() {
   const service = document.getElementById("bookingService")?.value;
   const date = document.getElementById("bookingDate")?.value;
   const time = document.getElementById("bookingTime")?.value;
+  const payment = document.getElementById("bookingPayment")?.value;
+  const trocoPara = Number(document.getElementById("bookingTrocoPara")?.value || 0);
 
   if (!service || !date || !time) {
     alert("Escolha o serviço, a data e um horário disponível.");
     return;
+  }
+  if (!payment) {
+    alert("Escolha a forma de pagamento.");
+    return;
+  }
+
+  const servicoAtual = SERVICES.find(s => s[0] === service);
+  const valorServico = precoAtualServico(service);
+  let troco = 0;
+
+  if (payment === "dinheiro" && trocoPara > 0) {
+    if (trocoPara < valorServico) {
+      alert(`O valor do troco para deve ser igual ou maior que ${money(valorServico)}.`);
+      return;
+    }
+    troco = trocoPara - valorServico;
   }
 
   const { client, cliente } = await getCurrentClient();
 
   if (!cliente) {
     alert("Entre na sua Área VIP para realizar o agendamento.");
+    return;
+  }
+
+  if (payment === "pagar_depois" && !cliente.permite_pagamento_posterior) {
+    alert("O pagamento posterior não está liberado para este cadastro.");
     return;
   }
 
@@ -365,7 +463,11 @@ async function confirmarAgendamento() {
       servico: service,
       data: date,
       horario: time,
-      status: "confirmado"
+      status: "confirmado",
+      forma_pagamento: payment,
+      troco_para: payment === "dinheiro" && trocoPara ? trocoPara : null,
+      troco: payment === "dinheiro" && trocoPara ? troco : null,
+      pagamento_status: payment === "pagar_depois" ? "pendente" : "pendente"
     });
 
   if (error) {
@@ -373,6 +475,10 @@ async function confirmarAgendamento() {
     if (error.code === "23505") {
       alert("Esse horário acabou de ser reservado por outra cliente. Escolha outro horário.");
       await carregarHorariosDisponiveis();
+      return;
+    }
+    if (error.code === "42703" || String(error.message || "").toLowerCase().includes("forma_pagamento")) {
+      alert("A parte de pagamento ainda não foi ativada no banco de dados. Rode o SQL de atualização que preparei junto com este código.");
       return;
     }
     alert("Não foi possível realizar o agendamento. Tente novamente.");
@@ -962,12 +1068,19 @@ window.adminSalvarPontos = async function (clienteId, vipId) {
   renderAdminVip();
 };
 
+window.adminAlternarPagamentoPosterior = async function (clienteId, permitido) {
+  const client = adminClient();
+  const { error } = await client.from("Clientes").update({ permite_pagamento_posterior: !!permitido }).eq("id", clienteId);
+  if (error) { console.error(error); alert("Não foi possível atualizar essa permissão."); return; }
+  renderAdminVip();
+};
+
 async function renderAdminVip() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
-  conteudo.innerHTML = `<h3>⭐ VIP Fidelidade</h3><p>Atualize os pontos de cada cliente. Máximo: 10 pontos.</p><div id="listaVipAdmin">Carregando...</div>`;
+  conteudo.innerHTML = `<h3>⭐ VIP Fidelidade</h3><p>Atualize os pontos e defina quais clientes de confiança podem pagar depois.</p><div id="listaVipAdmin">Carregando...</div>`;
   const client = adminClient();
-  const { data, error } = await client.from("Clientes").select("id,nome,whatsapp,email").order("nome");
+  const { data, error } = await client.from("Clientes").select("id,nome,whatsapp,email,permite_pagamento_posterior").order("nome");
   if (error) { document.getElementById("listaVipAdmin").textContent = "Não foi possível carregar as clientes."; return; }
   const ids = (data || []).map(x => x.id);
   let vips = [];
@@ -978,7 +1091,7 @@ async function renderAdminVip() {
   const vm = new Map(vips.map(v => [v.cliente_id, v]));
   document.getElementById("listaVipAdmin").innerHTML = (data || []).map(c => {
     const v = vm.get(c.id);
-    return `<div style="padding:12px;border-bottom:1px solid #eee;"><strong>${c.nome || "Cliente"}</strong><br><small>${c.whatsapp || ""} ${c.email ? "— "+c.email : ""}</small><br><input id="pontos-${c.id}" type="number" min="0" max="10" value="${v?.pontos ?? 0}" style="width:80px"><button class="primary small" onclick="adminSalvarPontos(${c.id}, ${v?.id ?? 'null'})">Salvar</button></div>`;
+    return `<div style="padding:12px;border-bottom:1px solid #eee;"><strong>${c.nome || "Cliente"}</strong><br><small>${c.whatsapp || ""} ${c.email ? "— "+c.email : ""}</small><br><label style="display:inline-flex;align-items:center;gap:8px;margin:8px 0;"><input type="checkbox" ${c.permite_pagamento_posterior ? "checked" : ""} onchange="adminAlternarPagamentoPosterior(${c.id}, this.checked)"> Permitir pagamento depois</label><br><input id="pontos-${c.id}" type="number" min="0" max="10" value="${v?.pontos ?? 0}" style="width:80px"><button class="primary small" onclick="adminSalvarPontos(${c.id}, ${v?.id ?? 'null'})">Salvar pontos</button></div>`;
   }).join("") || "Nenhuma cliente cadastrada.";
 }
 
@@ -1068,7 +1181,7 @@ async function renderAdminAgendamentos() {
   if (!conteudo) return;
   conteudo.innerHTML = `<h3>📋 Agendamentos</h3><div id="listaAgendamentosAdmin">Carregando...</div>`;
   const client = adminClient();
-  const { data, error } = await client.from("agendamentos").select("id,cliente_id,servico,data,horario,status").order("data", {ascending:false}).order("horario", {ascending:false});
+  const { data, error } = await client.from("agendamentos").select("id,cliente_id,servico,data,horario,status,forma_pagamento,troco_para,troco,pagamento_status").order("data", {ascending:false}).order("horario", {ascending:false});
   if (error) { document.getElementById("listaAgendamentosAdmin").textContent = "Não foi possível carregar os agendamentos."; return; }
   const ids = [...new Set((data || []).map(a => a.cliente_id).filter(Boolean))];
   let clientes = [];
@@ -1079,7 +1192,10 @@ async function renderAdminAgendamentos() {
   const cm = new Map(clientes.map(c => [c.id, c]));
   document.getElementById("listaAgendamentosAdmin").innerHTML = (data || []).map(a => {
     const c = cm.get(a.cliente_id);
-    return `<div style="padding:12px;border-bottom:1px solid #eee;"><strong>${a.data} — ${String(a.horario).slice(0,5)}</strong><br>${a.servico}<br>${c?.nome || "Cliente"} ${c?.whatsapp ? "— "+c.whatsapp : ""}<br>Status: ${a.status || ""}</div>`;
+    const pagamentos = {pix:"Pix",dinheiro:"Dinheiro",debito:"Cartão de débito",credito:"Cartão de crédito",pagar_depois:"Pagar depois"};
+    const pagamento = pagamentos[a.forma_pagamento] || "Não informado";
+    const trocoInfo = a.forma_pagamento === "dinheiro" && a.troco_para ? `<br>Troco para: ${money(a.troco_para)}${a.troco != null ? ` — Troco: ${money(a.troco)}` : ""}` : "";
+    return `<div style="padding:12px;border-bottom:1px solid #eee;"><strong>${a.data} — ${String(a.horario).slice(0,5)}</strong><br>${a.servico}<br>${c?.nome || "Cliente"} ${c?.whatsapp ? "— "+c.whatsapp : ""}<br>Status: ${a.status || ""}<br>Pagamento: ${pagamento} — ${a.pagamento_status || "pendente"}${trocoInfo}</div>`;
   }).join("") || "Nenhum agendamento cadastrado.";
 }
 
@@ -1439,25 +1555,34 @@ function configurarMeusAgendamentosEAvisos() {
 // O botão "ENTRAR NA ÁREA VIP" da abertura deve abrir login/cadastro,
 // nunca o formulário de agendamento.
 function corrigirEntradaAreaVIP() {
-  // CORREÇÃO ÚNICA: o botão rosa "ENTRAR NA ÁREA VIP"
-  // da abertura deve abrir somente o login/cadastro VIP.
-  // NÃO mexer no botão "ÁREA VIP" do cabeçalho, pois ele já está correto.
-  // NÃO mexer no botão de agendamento.
+  // Botão da navegação: abre login/cadastro.
+  const botaoEntrada = document.getElementById("loginBtn");
+  if (botaoEntrada) {
+    botaoEntrada.onclick = function (event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openVipModal();
+      return false;
+    };
+  }
+
+  // Botão VIP real da abertura do site.
+  // No index.html atual ele se chama #heroVip.
+  // O botão de agendamento é #heroBook e continua abrindo o agendamento.
   const botaoHero = document.getElementById("heroVip");
-  if (!botaoHero) return;
-
-  const abrirSomenteVIP = function (event) {
-    event.preventDefault();
-    event.stopPropagation();
-    if (event.stopImmediatePropagation) event.stopImmediatePropagation();
-    openVipModal();
-    return false;
-  };
-
-  // Capture vem antes dos outros handlers e impede que o botão seja
-  // interpretado como "Agendar horário".
-  botaoHero.addEventListener("click", abrirSomenteVIP, true);
-  botaoHero.onclick = abrirSomenteVIP;
+  if (botaoHero) {
+    botaoHero.onclick = function (event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openVipModal();
+      return false;
+    };
+    botaoHero.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openVipModal();
+    }, true);
+  }
 }
 
 // Mostra os dados reais da cliente logada no botão MEUS DADOS.
