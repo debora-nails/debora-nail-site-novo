@@ -1439,34 +1439,25 @@ function configurarMeusAgendamentosEAvisos() {
 // O botão "ENTRAR NA ÁREA VIP" da abertura deve abrir login/cadastro,
 // nunca o formulário de agendamento.
 function corrigirEntradaAreaVIP() {
-  // Botão da navegação: abre login/cadastro.
-  const botaoEntrada = document.getElementById("loginBtn");
-  if (botaoEntrada) {
-    botaoEntrada.onclick = function (event) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      openVipModal();
-      return false;
-    };
-  }
-
-  // Botão VIP real da abertura do site.
-  // No index.html atual ele se chama #heroVip.
-  // O botão de agendamento é #heroBook e continua abrindo o agendamento.
+  // CORREÇÃO ÚNICA: o botão rosa "ENTRAR NA ÁREA VIP"
+  // da abertura deve abrir somente o login/cadastro VIP.
+  // NÃO mexer no botão "ÁREA VIP" do cabeçalho, pois ele já está correto.
+  // NÃO mexer no botão de agendamento.
   const botaoHero = document.getElementById("heroVip");
-  if (botaoHero) {
-    botaoHero.onclick = function (event) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      openVipModal();
-      return false;
-    };
-    botaoHero.addEventListener("click", function (event) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      openVipModal();
-    }, true);
-  }
+  if (!botaoHero) return;
+
+  const abrirSomenteVIP = function (event) {
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+    openVipModal();
+    return false;
+  };
+
+  // Capture vem antes dos outros handlers e impede que o botão seja
+  // interpretado como "Agendar horário".
+  botaoHero.addEventListener("click", abrirSomenteVIP, true);
+  botaoHero.onclick = abrirSomenteVIP;
 }
 
 // Mostra os dados reais da cliente logada no botão MEUS DADOS.
