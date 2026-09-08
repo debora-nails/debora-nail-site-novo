@@ -143,10 +143,6 @@ function renderServices() {
     return `
       <article class="service-card">
 
-        <div class="service-number">
-          ${String(index + 1).padStart(2, "0")}
-        </div>
-
         ${
           images.length
             ? `
@@ -238,83 +234,233 @@ function closeModal() {
     ?.classList.remove("show");
 }
 
-function openBooking(index = null) {
+async function getCurrentClient() {
+  const client = adminClient();
+  const { data: sessionData } = await client.auth.getSession();
+  const user = sessionData?.session?.user;
+  if (!user) return { client, user: null, cliente: null };
+  const { data: cliente, error } = await client
+    .from("Clientes")
+    .select("id, nome, whatsapp, email, is_admin")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  return { client, user, cliente, error };
+}
+
+async function carregarHorariosDisponiveis() {
+  const date = document.getElementById("bookingDate")?.value;
+  const select = document.getElementById("bookingTime");
+  const status = document.getElementById("bookingTimeStatus");
+  if (!select) return;
+
+  select.innerHTML = `<option value="">Selecione uma data primeiro</option>`;
+  select.disabled = true;
+  if (status) status.textContent = "";
+
+  if (!date) return;
+
+  const client = adminClient();
+  const { data: horarios, error } = await client
+    .from("horarios")
+    .select("horario")
+    .eq("data", date)
+    .eq("disponivel", true)
+    .order("horario");
+
+  if (error) {
+    console.error(error);
+    select.innerHTML = `<option value="">Não foi possível carregar os horários</option>`;
+    return;
+  }
+
+  const { data: agendados, error: agError } = await client
+    .from("agendamentos")
+    .select("horario")
+    .eq("data", date)
+    .in("status", ["confirmado", "agendado", "pendente"]);
+
+  if (agError) console.error(agError);
+
+  const ocupados = new Set((agendados || []).map(item => item.horario));
+  const disponiveis = (horarios || []).filter(item => !ocupados.has(item.horario));
+
+  if (!disponiveis.length) {
+    select.innerHTML = `<option value="">Nenhum horário disponível nesta data</option>`;
+    if (status) status.textContent = "Escolha outra data ou aguarde novos horários.";
+    return;
+  }
+
+  select.disabled = false;
+  select.innerHTML =
+    `<option value="">Escolha um horário</option>` +
+    disponiveis.map(item => `<option value="${item.horario}">${item.horario}</option>`).join("");
+}
+
+async function openBooking(index = null) {
+  const { user } = await getCurrentClient();
+
+  if (!user) {
+    showModal(`
+      <h2>Área VIP 💗</h2>
+      <p class="muted">Para agendar seu horário pelo site, primeiro entre ou crie sua conta VIP.</p>
+      <button class="primary full" onclick="openVipModal()">ENTRAR NA ÁREA VIP</button>
+      <button class="secondary full" onclick="closeModal()">Voltar</button>
+    `);
+    return;
+  }
+
+  const hoje = new Date().toISOString().split("T")[0];
+
   showModal(`
     <h2>Agendar horário</h2>
-
-    <p class="muted">
-      Escolha o serviço e continue pelo WhatsApp para confirmar.
-    </p>
+    <p class="muted">Escolha o serviço, a data e um dos horários liberados pela Débora.</p>
 
     <label>
       Serviço
-
       <select id="bookingService">
-        ${SERVICES.map(
-          (service, number) => `
-            <option ${number === index ? "selected" : ""}>
-              ${service[0]} — ${money(service[1])}
-            </option>
-          `
-        ).join("")}
+        ${SERVICES.map((service, number) => `
+          <option value="${service[0]}" ${number === index ? "selected" : ""}>
+            ${service[0]} — ${money(service[1])}
+          </option>
+        `).join("")}
       </select>
     </label>
 
     <label>
       Data
-
-      <input
-        id="bookingDate"
-        type="date"
-      >
+      <input id="bookingDate" type="date" min="${hoje}" onchange="carregarHorariosDisponiveis()">
     </label>
 
     <label>
       Horário
-
-      <input
-        id="bookingTime"
-        type="time"
-        min="07:00"
-        max="19:00"
-      >
+      <select id="bookingTime" disabled>
+        <option value="">Selecione uma data primeiro</option>
+      </select>
     </label>
 
-    <button
-      class="primary full"
-      onclick="sendBooking()"
-    >
-      Continuar pelo WhatsApp
+    <p id="bookingTimeStatus" class="muted"></p>
+
+    <button class="primary full" onclick="confirmarAgendamento()">
+      AGENDAR HORÁRIO
+    </button>
+
+    <button class="secondary full" onclick="abrirWhatsAppAgendamento()">
+      CONTINUAR PELO WHATSAPP
     </button>
   `);
 }
 
-function sendBooking() {
-  const service =
-    document.getElementById("bookingService")?.value;
-
-  const date =
-    document.getElementById("bookingDate")?.value;
-
-  const time =
-    document.getElementById("bookingTime")?.value;
+async function confirmarAgendamento() {
+  const service = document.getElementById("bookingService")?.value;
+  const date = document.getElementById("bookingDate")?.value;
+  const time = document.getElementById("bookingTime")?.value;
 
   if (!service || !date || !time) {
-    alert("Preencha serviço, data e horário.");
+    alert("Escolha o serviço, a data e um horário disponível.");
+    return;
+  }
+
+  const { client, cliente } = await getCurrentClient();
+
+  if (!cliente) {
+    alert("Entre na sua Área VIP para realizar o agendamento.");
+    return;
+  }
+
+  const { error } = await client
+    .from("agendamentos")
+    .insert({
+      cliente_id: cliente.id,
+      servico: service,
+      data: date,
+      horario: time,
+      status: "confirmado"
+    });
+
+  if (error) {
+    console.error(error);
+    if (error.code === "23505") {
+      alert("Esse horário acabou de ser reservado por outra cliente. Escolha outro horário.");
+      await carregarHorariosDisponiveis();
+      return;
+    }
+    alert("Não foi possível realizar o agendamento. Tente novamente.");
+    return;
+  }
+
+  closeModal();
+  alert(`Agendamento realizado com sucesso! 💗\n\n${service}\n${date.split("-").reverse().join("/")}\n${time}`);
+}
+
+function abrirWhatsAppAgendamento() {
+  const service = document.getElementById("bookingService")?.value;
+  const date = document.getElementById("bookingDate")?.value;
+  const time = document.getElementById("bookingTime")?.value;
+
+  if (!service || !date || !time) {
+    alert("Escolha o serviço, a data e um horário antes de continuar pelo WhatsApp.");
     return;
   }
 
   const message =
-    `Olá, Débora! Gostaria de agendar:\n` +
-    `${service}\n` +
-    `Data: ${date}\n` +
-    `Horário: ${time}`;
+    `Olá, Débora! Gostaria de agendar:\n${service}\nData: ${date}\nHorário: ${time}`;
 
   window.open(
     `https://wa.me/5531972084333?text=${encodeURIComponent(message)}`,
     "_blank"
   );
 }
+
+/* Mantém compatibilidade com qualquer chamada antiga. */
+window.sendBooking = confirmarAgendamento;
+
+function openVipModal() {
+  showModal(`
+    <h2>Área VIP</h2>
+    <p class="muted">Entre na sua conta ou crie seu cadastro VIP.</p>
+
+    <h3>Entrar</h3>
+    <label>
+      E-mail
+      <input id="vipEmail" type="email" placeholder="Seu e-mail" autocomplete="email">
+    </label>
+
+    <label>
+      Senha
+      <input id="vipPassword" type="password" placeholder="Sua senha" autocomplete="current-password">
+    </label>
+
+    <button class="primary full" onclick="vipLogin()">ENTRAR NA ÁREA VIP</button>
+
+    <hr>
+
+    <h3>Criar minha conta VIP</h3>
+    <label>
+      Nome
+      <input id="vipNome" type="text" placeholder="Seu nome" autocomplete="name">
+    </label>
+
+    <label>
+      WhatsApp
+      <input id="vipWhatsApp" type="tel" placeholder="Seu WhatsApp" autocomplete="tel">
+    </label>
+
+    <label>
+      E-mail
+      <input id="vipEmailCadastro" type="email" placeholder="Seu e-mail" autocomplete="email">
+    </label>
+
+    <label>
+      Senha
+      <input id="vipPasswordCadastro" type="password" placeholder="Crie uma senha" autocomplete="new-password">
+    </label>
+
+    <button class="primary full" onclick="vipCadastro()">CRIAR CONTA VIP</button>
+  `);
+}
+
+window.openVipModal = openVipModal;
+
 
 document
   .getElementById("modal")
@@ -324,11 +470,19 @@ document
     }
   });
 
-document
-.getElementById("loginBtn")
-?.addEventListener("click", () => {
+document.getElementById("loginBtn")?.addEventListener("click", event => {
+  event.preventDefault();
+  event.stopPropagation();
+  openVipModal();
+}, true);
 
- window.vipLogin = async function () {
+document.getElementById("loginBtn")?.addEventListener("click", event => {
+  event.preventDefault();
+  event.stopPropagation();
+  openVipModal();
+});
+
+window.vipLogin = async function () {
   const email = document.getElementById("vipEmail")?.value.trim();
   const password = document.getElementById("vipPassword")?.value;
 
@@ -337,15 +491,8 @@ document
     return;
   }
 
-  const client = window.supabase.createClient(
-    window.SUPABASE_CONFIG.url,
-    window.SUPABASE_CONFIG.publishableKey
-  );
-
-  const { data, error } = await client.auth.signInWithPassword({
-    email,
-    password
-  });
+  const client = adminClient();
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
 
   if (error) {
     alert("E-mail ou senha incorretos.");
@@ -353,8 +500,6 @@ document
   }
 
   const user = data.user;
-
-  // Procura o cadastro da cliente
   let { data: cliente, error: clienteError } = await client
     .from("Clientes")
     .select("id, nome, whatsapp, email, is_admin")
@@ -367,20 +512,18 @@ document
     return;
   }
 
-  // Se a conta foi criada antes da confirmação de e-mail ser desligada,
-  // cria o cadastro na tabela Clientes agora.
   if (!cliente) {
     const nome = email.split("@")[0];
-
     const { data: novoCliente, error: novoClienteError } = await client
       .from("Clientes")
       .insert({
-        nome: nome,
+        id: Date.now(),
+        nome,
         whatsapp: "",
-        email: email,
+        email,
         user_id: user.id
       })
-      .select("id, nome, whatsapp, email")
+      .select("id, nome, whatsapp, email, is_admin")
       .single();
 
     if (novoClienteError) {
@@ -388,22 +531,33 @@ document
       alert("Entrou na conta, mas não foi possível criar seu cadastro.");
       return;
     }
-
     cliente = novoCliente;
   }
 
-  // Procura os pontos VIP
+  await carregarDadosVIP(cliente);
+
+  closeModal();
+
+  if (cliente.is_admin) {
+    await window.abrirAreaDebora();
+  } else {
+    document.querySelector("#vip")?.scrollIntoView({ behavior: "smooth" });
+  }
+
+  alert(`Bem-vinda, ${cliente.nome || "Cliente VIP"}! 💗`);
+};
+
+async function carregarDadosVIP(cliente) {
+  const client = adminClient();
+
   let { data: vip, error: vipError } = await client
     .from("vip_fidelidade")
     .select("pontos, beneficio_usado, data_expiracao")
     .eq("cliente_id", cliente.id)
     .maybeSingle();
 
-  if (vipError) {
-    console.error(vipError);
-  }
+  if (vipError) console.error(vipError);
 
-  // Se ainda não tiver cartão VIP, cria com 0 pontos
   if (!vip) {
     const { data: novoVip, error: novoVipError } = await client
       .from("vip_fidelidade")
@@ -415,167 +569,94 @@ document
       .select("pontos, beneficio_usado, data_expiracao")
       .single();
 
-    if (!novoVipError) {
-      vip = novoVip;
-    }
+    if (!novoVipError) vip = novoVip;
   }
 
-  // Atualiza o nome mostrado na Área VIP
   const welcomeTitle = document.getElementById("vipWelcomeTitle");
-
   if (welcomeTitle) {
-    welcomeTitle.innerHTML =
-      `Olá, ${cliente.Nome || "Cliente VIP"}! 💝`;
+    welcomeTitle.textContent = `Olá, ${cliente.nome || "Cliente VIP"}! 💝`;
   }
 
-  // Atualiza os pontos mostrados no painel
+  const pontos = Number(vip?.pontos || 0);
   const vipStats = document.querySelectorAll(".vip-stat");
-
   if (vipStats[1]) {
-    const points = vip?.pontos || 0;
     const pointsText = vipStats[1].querySelector("strong");
-
-    if (pointsText) {
-      pointsText.textContent = `${points} pts`;
-    }
+    if (pointsText) pointsText.textContent = `${pontos} pts`;
   }
 
+  atualizarCartaoVIP(pontos, vip);
+}
+
+window.vipCadastro = async function () {
+  const nome = document.getElementById("vipNome")?.value.trim();
+  const whatsapp = document.getElementById("vipWhatsApp")?.value.trim();
+  const email = document.getElementById("vipEmailCadastro")?.value.trim();
+  const password = document.getElementById("vipPasswordCadastro")?.value;
+
+  if (!nome || !whatsapp || !email || !password) {
+    alert("Preencha todos os campos.");
+    return;
+  }
+
+  if (password.length < 6) {
+    alert("A senha precisa ter pelo menos 6 caracteres.");
+    return;
+  }
+
+  const client = adminClient();
+  const { data, error } = await client.auth.signUp({ email, password });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  if (data.user && data.session) {
+    const { data: novoCliente, error: clienteError } = await client
+      .from("Clientes")
+      .insert({
+        id: Date.now(),
+        nome,
+        whatsapp,
+        email,
+        user_id: data.user.id
+      })
+      .select("id, nome, whatsapp, email, is_admin")
+      .single();
+
+    if (clienteError) {
+      console.error(clienteError);
+      alert("A conta foi criada, mas não consegui finalizar seu cadastro. Tente entrar novamente.");
+      return;
+    }
+
+    await client.from("vip_fidelidade").upsert({
+      cliente_id: novoCliente.id,
+      pontos: 0,
+      beneficio_usado: false
+    }, { onConflict: "cliente_id" });
+  }
+
+  alert("Cadastro realizado com sucesso! 💗");
   closeModal();
 
-  if (cliente.is_admin) {
-    await window.abrirAreaDebora();
-  } else {
-    document.querySelector("#vip")?.scrollIntoView({
-      behavior: "smooth"
-    });
+  if (data.session) {
+    setTimeout(() => window.vipLogin?.(), 100);
   }
+};
 
-  alert("Bem-vinda à sua Área VIP! 💗");
-}; 
+async function restaurarSessaoVIP() {
+  const { user, cliente } = await getCurrentClient();
+  if (!user || !cliente) return;
 
-  window.vipCadastro = async function () {
-    const nome = document.getElementById("vipNome")?.value.trim();
-    const whatsapp = document.getElementById("vipWhatsApp")?.value.trim();
-    const email = document.getElementById("vipEmailCadastro")?.value.trim();
-    const password = document.getElementById("vipPasswordCadastro")?.value;
+  await carregarDadosVIP(cliente);
 
-    if (!nome || !whatsapp || !email || !password) {
-      alert("Preencha todos os campos.");
-      return;
-    }
+  const welcomeTitle = document.getElementById("vipWelcomeTitle");
+  if (welcomeTitle) {
+    welcomeTitle.textContent = `Olá, ${cliente.nome || "Cliente VIP"}! 💝`;
+  }
+}
 
-    if (password.length < 6) {
-      alert("A senha precisa ter pelo menos 6 caracteres.");
-      return;
-    }
-
-    const client = window.supabase.createClient(
-      window.SUPABASE_CONFIG.url,
-      window.SUPABASE_CONFIG.publishableKey
-    );
-
-    const { data, error } = await client.auth.signUp({
-      email,
-      password
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    if (data.user) {
-      const { data: existente } = await client
-        .from("Clientes")
-        .select("id")
-        .eq("user_id", data.user.id)
-        .maybeSingle();
-
-      if (!existente) {
-        const novoId = Date.now();
-        const { data: novoCliente, error: clienteError } = await client
-          .from("Clientes")
-          .insert({
-            id: novoId,
-            nome,
-            whatsapp,
-            email,
-            user_id: data.user.id
-          })
-          .select("id")
-          .single();
-
-        if (clienteError) {
-          console.error(clienteError);
-          alert("A conta foi criada, mas não consegui finalizar seu cadastro. Tente entrar novamente.");
-          return;
-        }
-
-        await client.from("vip_fidelidade").upsert({
-          cliente_id: novoCliente.id,
-          pontos: 0,
-          beneficio_usado: false
-        }, { onConflict: "cliente_id" });
-      }
-    }
-
-    alert("Cadastro realizado com sucesso! 💗");
-    closeModal();
-  };
-
-  showModal(`
-    <h2>Área VIP</h2>
-
-    <p class="muted">
-      Entre na sua conta ou crie seu cadastro VIP.
-    </p>
-
-    <h3>Entrar</h3>
-
-    <label>
-      E-mail
-      <input id="vipEmail" type="email" placeholder="Seu e-mail">
-    </label>
-
-    <label>
-      Senha
-      <input id="vipPassword" type="password" placeholder="Sua senha">
-    </label>
-
-    <button class="primary full" onclick="vipLogin()">
-      ENTRAR NA ÁREA VIP
-    </button>
-
-    <hr>
-
-    <h3>Criar minha conta VIP</h3>
-
-    <label>
-      Nome
-      <input id="vipNome" type="text" placeholder="Seu nome">
-    </label>
-
-    <label>
-      WhatsApp
-      <input id="vipWhatsApp" type="tel" placeholder="Seu WhatsApp">
-    </label>
-
-    <label>
-      E-mail
-      <input id="vipEmailCadastro" type="email" placeholder="Seu e-mail">
-    </label>
-
-    <label>
-      Senha
-      <input id="vipPasswordCadastro" type="password" placeholder="Crie uma senha">
-    </label>
-
-    <button class="primary full" onclick="vipCadastro()">
-      CRIAR CONTA VIP
-    </button>
-  `);
-
-}); 
 
 document
   .getElementById("menuBtn")
@@ -920,5 +1001,158 @@ async function carregarPrecosPublicos() {
     renderServices();
   } catch (e) { console.warn("Não foi possível carregar preços do Supabase.", e); }
 }
+
+
+/* ===== MELHORIAS GERAIS DO CLUBE VIP ===== */
+
+function atualizarCartaoVIP(pontos, vip) {
+  const total = 10;
+  const quantidade = Math.max(0, Math.min(total, Number(pontos || 0)));
+
+  const seletores = [
+    ".vip-point",
+    ".vip-points .point",
+    ".fidelity-point",
+    ".fidelidade-point",
+    "[data-vip-point]",
+    "[data-point]"
+  ];
+
+  let elementos = [];
+  seletores.forEach(seletor => {
+    elementos.push(...document.querySelectorAll(seletor));
+  });
+  elementos = [...new Set(elementos)];
+
+  elementos.slice(0, total).forEach((el, index) => {
+    const ativo = index < quantidade;
+    el.classList.toggle("is-completed", ativo);
+    el.setAttribute("aria-label", ativo ? `Ponto ${index + 1} conquistado` : `Ponto ${index + 1} disponível`);
+    if (ativo) {
+      el.innerHTML = "💅";
+    }
+  });
+
+  if (quantidade >= 10) {
+    document.querySelectorAll(".vip-benefit-message, [data-vip-benefit]").forEach(el => {
+      el.textContent = "🎉 Cartão completo! Você conquistou 60% de desconto em qualquer procedimento.";
+    });
+  }
+}
+
+function configurarDetalhesVIP() {
+  document.addEventListener("click", event => {
+    const alvo = event.target.closest("button, a, [role='button'], .vip-stat, .vip-card");
+    if (!alvo) return;
+
+    const texto = (alvo.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+
+    if (texto.includes("pontos acumulados") || texto.includes("pontos")) {
+      const { cliente } = getCurrentClient();
+      if (cliente) {
+        cliente.then?.();
+      }
+    }
+
+    if (texto.includes("ver benefício") || texto.includes("benefício")) {
+      event.preventDefault();
+      const client = adminClient();
+      client.auth.getSession().then(async ({ data }) => {
+        if (!data?.session?.user) {
+          openVipModal();
+          return;
+        }
+        const { data: c } = await client.from("Clientes").select("id,nome").eq("user_id", data.session.user.id).maybeSingle();
+        if (!c) return;
+        const { data: vip } = await client.from("vip_fidelidade").select("pontos,beneficio_usado,data_expiracao").eq("cliente_id", c.id).maybeSingle();
+        const pontos = Number(vip?.pontos || 0);
+        showModal(`
+          <h2>Seu benefício 💗</h2>
+          <p>Você tem <strong>${pontos} de 10 pontos</strong>.</p>
+          <p>${pontos >= 10 ? "🎉 Seu benefício de 60% de desconto está disponível!" : `Faltam ${10 - pontos} ponto(s) para completar seu cartão.`}</p>
+          ${pontos >= 10 && vip?.data_expiracao ? `<p class="muted">Válido até ${String(vip.data_expiracao).split("-").reverse().join("/")}</p>` : ""}
+          <button class="primary full" onclick="closeModal()">Fechar</button>
+        `);
+      });
+    }
+
+    if (texto.includes("promoções")) {
+      event.preventDefault();
+      adminClient().from("promocoes").select("titulo,descricao,preco_promocional,data_inicio,data_fim").eq("ativo",true).order("created_at",{ascending:false}).then(({data,error})=>{
+        if(error){ console.error(error); return; }
+        showModal(`
+          <h2>Promoções 🎀</h2>
+          ${data?.length ? data.map(p=>`
+            <div class="promo-item">
+              <h3>${p.titulo}</h3>
+              <p>${p.descricao || ""}</p>
+              ${p.preco_promocional != null ? `<strong>${money(Number(p.preco_promocional))}</strong>` : ""}
+            </div>
+          `).join("") : `<p class="muted">No momento não há promoções cadastradas.</p>`}
+          <button class="primary full" onclick="closeModal()">Fechar</button>
+        `);
+      });
+    }
+  });
+}
+
+function aplicarAjustesMobileServicos() {
+  const style = document.createElement("style");
+  style.id = "ajustes-mobile-debora";
+  style.textContent = `
+    .service-number { display:none !important; }
+    @media (max-width: 700px) {
+      #servicesGrid {
+        grid-template-columns: 1fr !important;
+        width: 100% !important;
+      }
+      #servicesGrid .service-card {
+        width: 100% !important;
+        max-width: 100% !important;
+        min-width: 0 !important;
+        box-sizing: border-box !important;
+      }
+      #servicesGrid .service-images {
+        width: 100% !important;
+      }
+      #servicesGrid .service-images img {
+        max-width: 100% !important;
+      }
+      #servicesGrid .service-content {
+        min-width: 0 !important;
+      }
+      #servicesGrid .service-content h3 {
+        font-size: 18px !important;
+        line-height: 1.2 !important;
+      }
+      #servicesGrid .service-content p {
+        font-size: 13px !important;
+        line-height: 1.5 !important;
+      }
+      #servicesGrid .service-bottom {
+        display:flex !important;
+        align-items:center !important;
+        justify-content:space-between !important;
+        gap:12px !important;
+      }
+    }
+    .vip-point.is-completed {
+      position: relative;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+async function restaurarTudoAoAbrir() {
+  try {
+    await restaurarSessaoVIP();
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+aplicarAjustesMobileServicos();
+configurarDetalhesVIP();
+restaurarTudoAoAbrir();
 
 carregarPrecosPublicos();
