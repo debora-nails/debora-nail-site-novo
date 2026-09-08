@@ -817,6 +817,7 @@ function adminBotoes() {
       <button class="primary small" onclick="abrirAdminAba('fotos')">📸 Fotos</button>
       <button class="primary small" onclick="abrirAdminAba('promocoes')">🎀 Promoções</button>
       <button class="primary small" onclick="abrirAdminAba('vip')">⭐ VIP Fidelidade</button>
+      <button class="primary small" onclick="abrirAdminAba('clientes')">👥 Clientes</button>
       <button class="primary small" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
       <button class="primary small" data-admin-aba="financeiro" onclick="abrirAdminAba('financeiro')">💰 Financeiro</button>
       <button class="primary small" data-admin-aba="avisos" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
@@ -1051,6 +1052,50 @@ async function carregarPromocoesPublicas() {
   } catch (e) {
     console.warn("Erro ao carregar promoções públicas.", e);
   }
+}
+
+async function renderAdminClientes() {
+  const conteudo = document.getElementById("adminConteudo");
+  if (!conteudo) return;
+  conteudo.innerHTML = `
+    <h3>👥 Clientes</h3>
+    <p class="muted">Aqui aparecem as clientes que se cadastrarem no site. O pagamento depois fica desligado por padrão.</p>
+    <div id="listaClientesAdmin">Carregando...</div>
+  `;
+
+  const client = adminClient();
+  const { data, error } = await client
+    .from("Clientes")
+    .select("id,nome,whatsapp,email,is_admin,permite_pagamento_posterior")
+    .order("nome", { ascending: true });
+
+  const lista = document.getElementById("listaClientesAdmin");
+  if (error) {
+    console.error("Erro ao carregar clientes:", error);
+    if (lista) lista.innerHTML = `<p>Não foi possível carregar as clientes.</p><small>${escapeHtml(error.message || "Erro desconhecido")}</small>`;
+    return;
+  }
+
+  if (!data?.length) {
+    lista.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;">Ainda não há clientes cadastradas. 💗</div>`;
+    return;
+  }
+
+  lista.innerHTML = data.map(c => `
+    <div style="padding:16px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
+      <strong>👤 ${escapeHtml(c.nome || "Cliente")}</strong>
+      <div style="margin-top:5px;">📱 ${escapeHtml(c.whatsapp || "Não informado")}</div>
+      <div>✉️ ${escapeHtml(c.email || "Não informado")}</div>
+      <div style="margin-top:10px;">
+        <label style="display:inline-flex;align-items:center;gap:8px;">
+          <input type="checkbox" ${c.permite_pagamento_posterior ? "checked" : ""}
+            onchange="adminAlternarPagamentoPosterior(${Number(c.id)}, this.checked)">
+          <strong>Permitir “Pagar depois”</strong>
+        </label>
+      </div>
+      <small style="display:block;margin-top:6px;color:#777;">${c.permite_pagamento_posterior ? "Cliente autorizada a pagar depois." : "Pagamento depois desativado."}</small>
+    </div>
+  `).join("");
 }
 
 window.adminSalvarPontos = async function (clienteId, vipId) {
@@ -1420,7 +1465,7 @@ window.abrirAdminAba = async function (aba) {
   if (area) area.style.display = "block";
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
-  const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", agendamentos:"📋 Agendamentos", financeiro:"💰 Financeiro", avisos:"📢 Avisos e Novidades" };
+  const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", clientes:"👥 Clientes", agendamentos:"📋 Agendamentos", financeiro:"💰 Financeiro", avisos:"📢 Avisos e Novidades" };
   const container = area.querySelector(".admin-container") || area;
   const atual = document.getElementById("adminConteudo");
   let tabs = container.querySelector(".admin-tabs");
@@ -1450,7 +1495,7 @@ window.abrirAdminAba = async function (aba) {
     atual.id = "adminConteudo";
     container.appendChild(atual);
   }
-  const carregadores = { horarios:renderAdminHorarios, precos:renderAdminPrecos, fotos:renderAdminFotos, promocoes:renderAdminPromocoes, vip:renderAdminVip, agendamentos:renderAdminAgendamentos, financeiro:renderAdminFinanceiro, avisos:renderAdminAvisos };
+  const carregadores = { horarios:renderAdminHorarios, precos:renderAdminPrecos, fotos:renderAdminFotos, promocoes:renderAdminPromocoes, vip:renderAdminVip, clientes:renderAdminClientes, agendamentos:renderAdminAgendamentos, financeiro:renderAdminFinanceiro, avisos:renderAdminAvisos };
   await (carregadores[aba] || renderAdminHorarios)();
 };
 
