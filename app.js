@@ -127,7 +127,6 @@ let SERVICES = [
 
 const grid = document.getElementById("servicesGrid");
 const galleryGrid = document.getElementById("galleryGrid");
-let PROMOTIONS = [];
 
 const money = value =>
   value.toLocaleString("pt-BR", {
@@ -140,87 +139,54 @@ function renderServices() {
 
   grid.innerHTML = SERVICES.map((service, index) => {
     const [name, price, description, images] = service;
-    const promo = PROMOTIONS.find(p => p.servico === name && p.ativo && promocaoEstaValida(p));
-    const precoPromo = promo?.preco_promocional != null ? Number(promo.preco_promocional) : null;
-
-    const precoHtml = precoPromo != null && precoPromo < Number(price)
-      ? `
-        <div class="service-price-promo">
-          <s>${money(Number(price))}</s>
-          <strong>${money(precoPromo)}</strong>
-        </div>
-      `
-      : `<strong>${money(Number(price))}</strong>`;
 
     return `
       <article class="service-card">
+
         ${
           images.length
             ? `
               <div class="service-images">
-                ${images.map(image => `
-                  <img src="${image}" alt="${name}" loading="lazy">
-                `).join("")}
+                ${images
+                  .map(
+                    image => `
+                      <img
+                        src="${image}"
+                        alt="${name}"
+                        loading="lazy"
+                      >
+                    `
+                  )
+                  .join("")}
               </div>
             `
             : ""
         }
 
         <div class="service-content">
+
           <h3>${name}</h3>
+
           <p>${description}</p>
 
           <div class="service-bottom">
-            ${precoHtml}
+
+            <strong>${money(price)}</strong>
+
             <button
               class="primary small"
               onclick="openBooking(${index})"
             >
               Agendar
             </button>
+
           </div>
+
         </div>
+
       </article>
     `;
   }).join("");
-}
-
-function promocaoEstaValida(promo) {
-  if (!promo || !promo.ativo) return false;
-  const hoje = new Date().toISOString().slice(0, 10);
-  if (promo.data_inicio && promo.data_inicio > hoje) return false;
-  if (promo.data_fim && promo.data_fim < hoje) return false;
-  return true;
-}
-
-async function carregarPromocoesPublicas() {
-  try {
-    const client = adminClient();
-    const { data, error } = await client
-      .from("promocoes")
-      .select("id,titulo,descricao,servico,preco_promocional,data_inicio,data_fim,ativo")
-      .eq("ativo", true)
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      console.warn("Não foi possível carregar promoções.", error);
-      return;
-    }
-
-    PROMOTIONS = data || [];
-    renderServices();
-
-    const validas = PROMOTIONS.filter(promocaoEstaValida);
-    document.querySelectorAll(".vip-stat").forEach(stat => {
-      const texto = (stat.textContent || "").toLowerCase();
-      if (texto.includes("promoções")) {
-        const numero = stat.querySelector("strong");
-        if (numero) numero.textContent = `${validas.length}`;
-      }
-    });
-  } catch (e) {
-    console.warn("Não foi possível carregar promoções.", e);
-  }
 }
 
 function renderGallery() {
@@ -586,7 +552,7 @@ async function carregarDadosVIP(cliente) {
 
   let { data: vip, error: vipError } = await client
     .from("vip_fidelidade")
-    .select("pontos, beneficio_usado, data_expiracao")
+    .select("pontos, beneficio_usado")
     .eq("cliente_id", cliente.id)
     .maybeSingle();
 
@@ -600,7 +566,7 @@ async function carregarDadosVIP(cliente) {
         pontos: 0,
         beneficio_usado: false
       })
-      .select("pontos, beneficio_usado, data_expiracao")
+      .select("pontos, beneficio_usado")
       .single();
 
     if (!novoVipError) vip = novoVip;
@@ -890,42 +856,16 @@ async function renderAdminFotos() {
 
 window.adminAdicionarPromocao = async function () {
   const titulo = document.getElementById("promoTitulo")?.value.trim();
-  const servico = document.getElementById("promoServico")?.value;
   const descricao = document.getElementById("promoDescricao")?.value.trim();
   const preco = document.getElementById("promoPreco")?.value;
   const inicio = document.getElementById("promoInicio")?.value || null;
   const fim = document.getElementById("promoFim")?.value || null;
-
-  if (!servico) return alert("Escolha o serviço que entrará em promoção.");
   if (!titulo) return alert("Informe o título da promoção.");
-  if (preco === "" || !Number.isFinite(Number(preco)) || Number(preco) < 0) {
-    return alert("Informe um preço promocional válido.");
-  }
-
-  const servicoBase = SERVICES.find(s => s[0] === servico);
-  if (servicoBase && Number(preco) >= Number(servicoBase[1])) {
-    return alert(`O preço promocional deve ser menor que o preço original de ${money(Number(servicoBase[1]))}.`);
-  }
-
   const client = adminClient();
-  const { error } = await client.from("promocoes").insert({
-    titulo,
-    servico,
-    descricao,
-    preco_promocional: Number(preco),
-    data_inicio: inicio,
-    data_fim: fim,
-    ativo: true
-  });
-
-  if (error) {
-    console.error(error);
-    return alert("Não foi possível criar a promoção. Verifique se a coluna de serviço foi criada no Supabase.");
-  }
-
+  const { error } = await client.from("promocoes").insert({ titulo, descricao, preco_promocional: preco === "" ? null : Number(preco), data_inicio: inicio, data_fim: fim, ativo: true });
+  if (error) return alert("Não foi possível criar a promoção.");
   alert("Promoção criada! 💗");
-  await renderAdminPromocoes();
-  await carregarPromocoesPublicas();
+  renderAdminPromocoes();
 };
 
 window.adminDesativarPromocao = async function (id) {
@@ -938,13 +878,7 @@ window.adminDesativarPromocao = async function (id) {
 async function renderAdminPromocoes() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
-
   conteudo.innerHTML = `<h3>🎀 Promoções</h3>
-    <p>Escolha o serviço, defina o preço promocional e, se quiser, coloque um período para a oferta.</p>
-    <select id="promoServico">
-      <option value="">Escolha o serviço</option>
-      ${SERVICES.map(s => `<option value="${s[0]}">${s[0]} — ${money(Number(s[1]))}</option>`).join("")}
-    </select>
     <input id="promoTitulo" placeholder="Título da promoção">
     <input id="promoDescricao" placeholder="Descrição">
     <input id="promoPreco" type="number" step="0.01" placeholder="Preço promocional">
@@ -952,30 +886,11 @@ async function renderAdminPromocoes() {
     <label>Fim<input id="promoFim" type="date"></label>
     <button class="primary small" onclick="adminAdicionarPromocao()">Criar promoção</button>
     <div id="listaPromosAdmin" style="margin-top:18px">Carregando...</div>`;
-
   const client = adminClient();
-  const { data, error } = await client
-    .from("promocoes")
-    .select("id,titulo,descricao,servico,preco_promocional,data_inicio,data_fim,ativo")
-    .order("created_at", { ascending: false });
-
-  if (error) {
-    console.error(error);
-    document.getElementById("listaPromosAdmin").textContent = "Não foi possível carregar as promoções.";
-    return;
-  }
-
+  const { data, error } = await client.from("promocoes").select("id,titulo,descricao,preco_promocional,data_inicio,data_fim,ativo").order("created_at", {ascending:false});
+  if (error) { document.getElementById("listaPromosAdmin").textContent = "Não foi possível carregar as promoções."; return; }
   document.getElementById("listaPromosAdmin").innerHTML = (data || []).map(r => `
-    <div style="padding:12px;border-bottom:1px solid #eee;">
-      <strong>${r.titulo}</strong><br>
-      <span>${r.servico || "Serviço não informado"}</span><br>
-      ${r.descricao || ""}
-      ${r.preco_promocional != null ? `<br><s>${money(Number(SERVICES.find(s => s[0] === r.servico)?.[1] || r.preco_promocional))}</s> → <strong>${money(Number(r.preco_promocional))}</strong>` : ""}
-      ${r.data_inicio || r.data_fim ? `<br><small>${r.data_inicio ? r.data_inicio.split("-").reverse().join("/") : "Início livre"} até ${r.data_fim ? r.data_fim.split("-").reverse().join("/") : "sem data final"}</small>` : ""}
-      <br>Status: ${r.ativo ? "Ativa" : "Inativa"}
-      ${r.ativo ? `<button class="primary small" onclick="adminDesativarPromocao(${r.id})">Desativar</button>` : ""}
-    </div>
-  `).join("") || "Nenhuma promoção cadastrada.";
+    <div style="padding:12px;border-bottom:1px solid #eee;"><strong>${r.titulo}</strong><br>${r.descricao || ""}${r.preco_promocional != null ? `<br>${money(Number(r.preco_promocional))}` : ""}<br>Status: ${r.ativo ? "Ativa" : "Inativa"} ${r.ativo ? `<button class="primary small" onclick="adminDesativarPromocao(${r.id})">Desativar</button>` : ""}</div>`).join("") || "Nenhuma promoção cadastrada.";
 }
 
 window.adminSalvarPontos = async function (clienteId, vipId) {
@@ -1149,13 +1064,12 @@ function configurarDetalhesVIP() {
         }
         const { data: c } = await client.from("Clientes").select("id,nome").eq("user_id", data.session.user.id).maybeSingle();
         if (!c) return;
-        const { data: vip } = await client.from("vip_fidelidade").select("pontos,beneficio_usado,data_expiracao").eq("cliente_id", c.id).maybeSingle();
+        const { data: vip } = await client.from("vip_fidelidade").select("pontos,beneficio_usado").eq("cliente_id", c.id).maybeSingle();
         const pontos = Number(vip?.pontos || 0);
         showModal(`
           <h2>Seu benefício 💗</h2>
           <p>Você tem <strong>${pontos} de 10 pontos</strong>.</p>
           <p>${pontos >= 10 ? "🎉 Seu benefício de 60% de desconto está disponível!" : `Faltam ${10 - pontos} ponto(s) para completar seu cartão.`}</p>
-          ${pontos >= 10 && vip?.data_expiracao ? `<p class="muted">Válido até ${String(vip.data_expiracao).split("-").reverse().join("/")}</p>` : ""}
           <button class="primary full" onclick="closeModal()">Fechar</button>
         `);
       });
@@ -1163,14 +1077,13 @@ function configurarDetalhesVIP() {
 
     if (texto.includes("promoções")) {
       event.preventDefault();
-      adminClient().from("promocoes").select("titulo,descricao,servico,preco_promocional,data_inicio,data_fim").eq("ativo",true).order("created_at",{ascending:false}).then(({data,error})=>{
+      adminClient().from("promocoes").select("titulo,descricao,preco_promocional,data_inicio,data_fim").eq("ativo",true).order("created_at",{ascending:false}).then(({data,error})=>{
         if(error){ console.error(error); return; }
         showModal(`
           <h2>Promoções 🎀</h2>
           ${data?.length ? data.map(p=>`
             <div class="promo-item">
               <h3>${p.titulo}</h3>
-              ${p.servico ? `<p><strong>${p.servico}</strong></p>` : ""}
               <p>${p.descricao || ""}</p>
               ${p.preco_promocional != null ? `<strong>${money(Number(p.preco_promocional))}</strong>` : ""}
             </div>
@@ -1225,27 +1138,6 @@ function aplicarAjustesMobileServicos() {
     .vip-point.is-completed {
       position: relative;
     }
-
-    .service-price-promo {
-      display: flex;
-      flex-direction: column;
-      align-items: flex-start;
-      line-height: 1.05;
-    }
-
-    .service-price-promo s {
-      color: #9a7f88;
-      font-size: 14px;
-      margin-bottom: 3px;
-      text-decoration-thickness: 1.5px;
-    }
-
-    .service-price-promo strong {
-      color: #d65f7b !important;
-      font-family: "Playfair Display", serif;
-      font-size: 22px;
-      font-weight: 600;
-    }
   `;
   document.head.appendChild(style);
 }
@@ -1263,7 +1155,6 @@ configurarDetalhesVIP();
 restaurarTudoAoAbrir();
 
 carregarPrecosPublicos();
-carregarPromocoesPublicas();
 
 /* ===== CORREÇÕES FINAIS DA ÁREA VIP ===== */
 
@@ -1275,23 +1166,28 @@ function corrigirEntradaAreaVIP() {
   if (botaoEntrada) {
     botaoEntrada.onclick = function (event) {
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       openVipModal();
       return false;
     };
   }
 
-  // Botão grande do início: também abre login/cadastro.
-  // O HTML antigo chamava openBooking() diretamente, por isso ele estava
-  // abrindo o agendamento quando deveria abrir a Área VIP.
-  const botaoHero = document.querySelector(".hero-button");
+  // Botão VIP real da abertura do site.
+  // No index.html atual ele se chama #heroVip.
+  // O botão de agendamento é #heroBook e continua abrindo o agendamento.
+  const botaoHero = document.getElementById("heroVip");
   if (botaoHero) {
     botaoHero.onclick = function (event) {
       event.preventDefault();
-      event.stopPropagation();
+      event.stopImmediatePropagation();
       openVipModal();
       return false;
     };
+    botaoHero.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openVipModal();
+    }, true);
   }
 }
 
