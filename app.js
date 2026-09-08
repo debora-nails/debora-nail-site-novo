@@ -241,7 +241,7 @@ async function getCurrentClient() {
   const user = sessionData?.session?.user;
   if (!user) return { client, user: null, cliente: null };
   const { data: cliente, error } = await client
-    .from("clientes")
+    .from("Clientes")
     .select("id, nome, whatsapp, email, is_admin, permite_pagamento_posterior")
     .eq("user_id", user.id)
     .maybeSingle();
@@ -598,7 +598,7 @@ window.vipLogin = async function () {
 
   const user = data.user;
   let { data: cliente, error: clienteError } = await client
-    .from("clientes")
+    .from("Clientes")
     .select("id, nome, whatsapp, email, is_admin")
     .eq("user_id", user.id)
     .maybeSingle();
@@ -612,7 +612,7 @@ window.vipLogin = async function () {
   if (!cliente) {
     const nome = email.split("@")[0];
     const { data: novoCliente, error: novoClienteError } = await client
-      .from("clientes")
+      .from("Clientes")
       .insert({
         id: Date.now(),
         nome,
@@ -710,7 +710,7 @@ window.vipCadastro = async function () {
 
   if (data.user && data.session) {
     const { data: novoCliente, error: clienteError } = await client
-      .from("clientes")
+      .from("Clientes")
       .insert({
         id: Date.now(),
         nome,
@@ -781,7 +781,7 @@ async function verificarAdmin() {
   if (!user) return { ok: false, message: "Entre primeiro na sua conta VIP." };
 
   const { data, error } = await client
-    .from("clientes")
+    .from("Clientes")
     .select("id, nome, whatsapp, email, is_admin")
     .eq("user_id", user.id)
     .maybeSingle();
@@ -817,7 +817,6 @@ function adminBotoes() {
       <button class="primary small" onclick="abrirAdminAba('fotos')">📸 Fotos</button>
       <button class="primary small" onclick="abrirAdminAba('promocoes')">🎀 Promoções</button>
       <button class="primary small" onclick="abrirAdminAba('vip')">⭐ VIP Fidelidade</button>
-      <button class="primary small" onclick="abrirAdminAba('clientes')">👥 Clientes</button>
       <button class="primary small" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
       <button class="primary small" data-admin-aba="financeiro" onclick="abrirAdminAba('financeiro')">💰 Financeiro</button>
       <button class="primary small" data-admin-aba="avisos" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
@@ -1054,50 +1053,6 @@ async function carregarPromocoesPublicas() {
   }
 }
 
-async function renderAdminClientes() {
-  const conteudo = document.getElementById("adminConteudo");
-  if (!conteudo) return;
-  conteudo.innerHTML = `
-    <h3>👥 Clientes</h3>
-    <p class="muted">Aqui aparecem as clientes que se cadastrarem no site. O pagamento depois fica desligado por padrão.</p>
-    <div id="listaClientesAdmin">Carregando...</div>
-  `;
-
-  const client = adminClient();
-  const { data, error } = await client
-    .from("clientes")
-    .select("id,nome,whatsapp,email,is_admin,permite_pagamento_posterior")
-    .order("nome", { ascending: true });
-
-  const lista = document.getElementById("listaClientesAdmin");
-  if (error) {
-    console.error("Erro ao carregar clientes:", error);
-    if (lista) lista.innerHTML = `<p>Não foi possível carregar as clientes.</p><small>${escapeHtml(error.message || "Erro desconhecido")}</small>`;
-    return;
-  }
-
-  if (!data?.length) {
-    lista.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;">Ainda não há clientes cadastradas. 💗</div>`;
-    return;
-  }
-
-  lista.innerHTML = data.map(c => `
-    <div style="padding:16px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
-      <strong>👤 ${escapeHtml(c.nome || "Cliente")}</strong>
-      <div style="margin-top:5px;">📱 ${escapeHtml(c.whatsapp || "Não informado")}</div>
-      <div>✉️ ${escapeHtml(c.email || "Não informado")}</div>
-      <div style="margin-top:10px;">
-        <label style="display:inline-flex;align-items:center;gap:8px;">
-          <input type="checkbox" ${c.permite_pagamento_posterior ? "checked" : ""}
-            onchange="adminAlternarPagamentoPosterior(${Number(c.id)}, this.checked)">
-          <strong>Permitir “Pagar depois”</strong>
-        </label>
-      </div>
-      <small style="display:block;margin-top:6px;color:#777;">${c.permite_pagamento_posterior ? "Cliente autorizada a pagar depois." : "Pagamento depois desativado."}</small>
-    </div>
-  `).join("");
-}
-
 window.adminSalvarPontos = async function (clienteId, vipId) {
   const input = document.getElementById(`pontos-${clienteId}`);
   const pontos = Number(input?.value);
@@ -1116,7 +1071,7 @@ window.adminSalvarPontos = async function (clienteId, vipId) {
 
 window.adminAlternarPagamentoPosterior = async function (clienteId, permitido) {
   const client = adminClient();
-  const { error } = await client.from("clientes").update({ permite_pagamento_posterior: !!permitido }).eq("id", clienteId);
+  const { error } = await client.from("Clientes").update({ permite_pagamento_posterior: !!permitido }).eq("id", clienteId);
   if (error) { console.error(error); alert("Não foi possível atualizar essa permissão."); return; }
   renderAdminVip();
 };
@@ -1126,7 +1081,7 @@ async function renderAdminVip() {
   if (!conteudo) return;
   conteudo.innerHTML = `<h3>⭐ VIP Fidelidade</h3><p>Atualize os pontos e defina quais clientes de confiança podem pagar depois.</p><div id="listaVipAdmin">Carregando...</div>`;
   const client = adminClient();
-  const { data, error } = await client.from("clientes").select("id,nome,whatsapp,email,permite_pagamento_posterior").order("nome");
+  const { data, error } = await client.from("Clientes").select("id,nome,whatsapp,email,permite_pagamento_posterior").order("nome");
   if (error) { document.getElementById("listaVipAdmin").textContent = "Não foi possível carregar as clientes."; return; }
   const ids = (data || []).map(x => x.id);
   let vips = [];
@@ -1249,7 +1204,7 @@ async function renderAdminAgendamentos() {
     let clientes = [];
 
     if (ids.length) {
-      const r = await client.from("clientes").select("id,nome,whatsapp").in("id", ids);
+      const r = await client.from("Clientes").select("id,nome,whatsapp").in("id", ids);
       if (r.error) {
         console.error("Erro ao carregar clientes dos agendamentos:", r.error);
       } else {
@@ -1465,7 +1420,7 @@ window.abrirAdminAba = async function (aba) {
   if (area) area.style.display = "block";
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
-  const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", clientes:"👥 Clientes", agendamentos:"📋 Agendamentos", financeiro:"💰 Financeiro", avisos:"📢 Avisos e Novidades" };
+  const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", agendamentos:"📋 Agendamentos", financeiro:"💰 Financeiro", avisos:"📢 Avisos e Novidades" };
   const container = area.querySelector(".admin-container") || area;
   const atual = document.getElementById("adminConteudo");
   let tabs = container.querySelector(".admin-tabs");
@@ -1495,7 +1450,7 @@ window.abrirAdminAba = async function (aba) {
     atual.id = "adminConteudo";
     container.appendChild(atual);
   }
-  const carregadores = { horarios:renderAdminHorarios, precos:renderAdminPrecos, fotos:renderAdminFotos, promocoes:renderAdminPromocoes, vip:renderAdminVip, clientes:renderAdminClientes, agendamentos:renderAdminAgendamentos, financeiro:renderAdminFinanceiro, avisos:renderAdminAvisos };
+  const carregadores = { horarios:renderAdminHorarios, precos:renderAdminPrecos, fotos:renderAdminFotos, promocoes:renderAdminPromocoes, vip:renderAdminVip, agendamentos:renderAdminAgendamentos, financeiro:renderAdminFinanceiro, avisos:renderAdminAvisos };
   await (carregadores[aba] || renderAdminHorarios)();
 };
 
@@ -1584,7 +1539,7 @@ function configurarDetalhesVIP() {
           openVipModal();
           return;
         }
-        const { data: c } = await client.from("clientes").select("id,nome").eq("user_id", data.session.user.id).maybeSingle();
+        const { data: c } = await client.from("Clientes").select("id,nome").eq("user_id", data.session.user.id).maybeSingle();
         if (!c) return;
         const { data: vip } = await client.from("vip_fidelidade").select("pontos,beneficio_usado").eq("cliente_id", c.id).maybeSingle();
         const pontos = Number(vip?.pontos || 0);
