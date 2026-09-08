@@ -712,6 +712,7 @@ function adminBotoes() {
       <button class="primary small" onclick="abrirAdminAba('promocoes')">🎀 Promoções</button>
       <button class="primary small" onclick="abrirAdminAba('vip')">⭐ VIP Fidelidade</button>
       <button class="primary small" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
+      <button class="primary small" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
     </div>
   `;
 }
@@ -981,6 +982,85 @@ async function renderAdminVip() {
   }).join("") || "Nenhuma cliente cadastrada.";
 }
 
+
+window.adminAdicionarAviso = async function () {
+  const titulo = document.getElementById("adminAvisoTitulo")?.value.trim();
+  const mensagem = document.getElementById("adminAvisoMensagem")?.value.trim();
+  if (!titulo || !mensagem) return alert("Preencha o título e a mensagem do aviso.");
+
+  const client = adminClient();
+  const { error } = await client.from("avisos_novidades").insert({
+    titulo,
+    mensagem,
+    ativo: true
+  });
+
+  if (error) {
+    console.error(error);
+    return alert("Não foi possível publicar o aviso.");
+  }
+
+  alert("Aviso publicado com sucesso! 💗");
+  renderAdminAvisos();
+  carregarAvisosPublicos();
+};
+
+window.adminDesativarAviso = async function (id) {
+  const client = adminClient();
+  const { error } = await client.from("avisos_novidades").update({ ativo: false }).eq("id", id);
+  if (error) return alert("Não foi possível desativar o aviso.");
+  renderAdminAvisos();
+  carregarAvisosPublicos();
+};
+
+window.adminExcluirAviso = async function (id) {
+  if (!confirm("Excluir este aviso?")) return;
+  const client = adminClient();
+  const { error } = await client.from("avisos_novidades").delete().eq("id", id);
+  if (error) return alert("Não foi possível excluir o aviso.");
+  renderAdminAvisos();
+  carregarAvisosPublicos();
+};
+
+async function renderAdminAvisos() {
+  const conteudo = document.getElementById("adminConteudo");
+  if (!conteudo) return;
+  conteudo.innerHTML = `
+    <h3>📢 Avisos e Novidades</h3>
+    <p>Escreva aqui o que você quer mostrar para suas clientes na Área VIP.</p>
+    <div style="display:grid;gap:10px;max-width:760px;">
+      <input id="adminAvisoTitulo" type="text" placeholder="Título do aviso">
+      <textarea id="adminAvisoMensagem" rows="5" placeholder="Escreva seu aviso ou novidade..."></textarea>
+      <button class="primary small" onclick="adminAdicionarAviso()">📢 Publicar aviso</button>
+    </div>
+    <div id="listaAvisosAdmin" style="margin-top:18px">Carregando...</div>
+  `;
+
+  const client = adminClient();
+  const { data, error } = await client
+    .from("avisos_novidades")
+    .select("id,titulo,mensagem,ativo,created_at")
+    .order("id", { ascending: false });
+
+  if (error) {
+    console.error(error);
+    document.getElementById("listaAvisosAdmin").textContent = "Não foi possível carregar os avisos.";
+    return;
+  }
+
+  document.getElementById("listaAvisosAdmin").innerHTML = (data || []).map(a => `
+    <div style="padding:14px;border:1px solid #ead7df;border-radius:14px;margin-bottom:10px;">
+      <strong>${escapeHtml(a.titulo)}</strong>
+      <p style="white-space:pre-wrap;">${escapeHtml(a.mensagem)}</p>
+      <small>Status: ${a.ativo ? "Ativo" : "Inativo"}</small>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+        ${a.ativo ? `<button class="primary small" onclick="adminDesativarAviso(${a.id})">Desativar</button>` : ""}
+        <button class="secondary small" onclick="adminExcluirAviso(${a.id})">Excluir</button>
+      </div>
+    </div>
+  `).join("") || "<p>Nenhum aviso cadastrado ainda.</p>";
+}
+
 async function renderAdminAgendamentos() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
@@ -1008,7 +1088,7 @@ window.abrirAdminAba = async function (aba) {
   if (area) area.style.display = "block";
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
-  const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", agendamentos:"📋 Agendamentos" };
+  const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", agendamentos:"📋 Agendamentos", avisos:"📢 Avisos e Novidades" };
   const container = area.querySelector(".admin-container") || area;
   if (!container.querySelector(".admin-tabs")) {
     const atual = document.getElementById("adminConteudo");
@@ -1025,7 +1105,7 @@ window.abrirAdminAba = async function (aba) {
     atual.id = "adminConteudo";
     container.appendChild(atual);
   }
-  const carregadores = { horarios:renderAdminHorarios, precos:renderAdminPrecos, fotos:renderAdminFotos, promocoes:renderAdminPromocoes, vip:renderAdminVip, agendamentos:renderAdminAgendamentos };
+  const carregadores = { horarios:renderAdminHorarios, precos:renderAdminPrecos, fotos:renderAdminFotos, promocoes:renderAdminPromocoes, vip:renderAdminVip, agendamentos:renderAdminAgendamentos, avisos:renderAdminAvisos };
   await (carregadores[aba] || renderAdminHorarios)();
 };
 
@@ -1209,6 +1289,128 @@ restaurarTudoAoAbrir();
 carregarPrecosPublicos();
 carregarPromocoesPublicas();
 
+
+/* ===== MEUS AGENDAMENTOS + AVISOS E NOVIDADES ===== */
+
+async function abrirMeusAgendamentos() {
+  const { user, cliente } = await getCurrentClient();
+  if (!user || !cliente) {
+    openVipModal();
+    return;
+  }
+
+  const client = adminClient();
+  const { data, error } = await client
+    .from("agendamentos")
+    .select("id,servico,data,horario,status")
+    .eq("cliente_id", cliente.id)
+    .order("data", { ascending: false })
+    .order("horario", { ascending: false });
+
+  if (error) {
+    console.error(error);
+    return showModal(`
+      <h2>Meus agendamentos 💗</h2>
+      <p>Não foi possível carregar seus agendamentos agora. Tente novamente.</p>
+      <button class="primary full" onclick="closeModal()">Fechar</button>
+    `);
+  }
+
+  const formatDate = value => value ? value.split("-").reverse().join("/") : "";
+  const statusLabel = value => {
+    const s = String(value || "").toLowerCase();
+    if (s === "confirmado" || s === "agendado") return "Agendado";
+    if (s === "realizado") return "Realizado";
+    if (s === "cancelado") return "Cancelado";
+    return value || "Agendado";
+  };
+
+  const lista = data || [];
+  showModal(`
+    <h2>Meus agendamentos 💗</h2>
+    <p class="muted">Aqui ficam seus horários atuais e seu histórico de agendamentos.</p>
+    ${lista.length ? `
+      <div style="display:grid;gap:10px;max-height:55vh;overflow:auto;">
+        ${lista.map(a => `
+          <div style="padding:14px;border:1px solid #ead7df;border-radius:14px;">
+            <strong>💅 ${escapeHtml(a.servico)}</strong>
+            <div>📅 ${formatDate(a.data)}</div>
+            <div>🕐 ${escapeHtml(a.horario)}</div>
+            <div style="margin-top:5px;"><strong>Status: ${escapeHtml(statusLabel(a.status))}</strong></div>
+          </div>
+        `).join("")}
+      </div>
+    ` : `<p>Você ainda não possui agendamentos.</p>`}
+    <button class="primary full" style="margin-top:14px;" onclick="closeModal();openBooking()">Agendar novo horário</button>
+  `);
+}
+
+async function carregarAvisosPublicos() {
+  try {
+    const client = adminClient();
+    const { data, error } = await client
+      .from("avisos_novidades")
+      .select("id,titulo,mensagem,ativo")
+      .eq("ativo", true)
+      .order("id", { ascending: false });
+    if (error) {
+      console.warn("Não foi possível carregar avisos e novidades.", error);
+      return;
+    }
+    window.AVISOS_NOVIDADES = data || [];
+  } catch (e) {
+    console.warn("Não foi possível carregar avisos e novidades.", e);
+  }
+}
+
+function abrirAvisosNovidades() {
+  const avisos = window.AVISOS_NOVIDADES || [];
+  showModal(`
+    <h2>Avisos e novidades 📢</h2>
+    <p class="muted">Fique por dentro das novidades da Débora Nail.</p>
+    ${avisos.length ? avisos.map(a => `
+      <article style="padding:14px;border:1px solid #ead7df;border-radius:14px;margin-bottom:10px;">
+        <h3>${escapeHtml(a.titulo)}</h3>
+        <p style="white-space:pre-wrap;">${escapeHtml(a.mensagem)}</p>
+      </article>
+    `).join("") : `<p>No momento não há avisos ou novidades publicados.</p>`}
+    <button class="primary full" onclick="closeModal()">Fechar</button>
+  `);
+}
+
+function configurarMeusAgendamentosEAvisos() {
+  const substituirTexto = () => {
+    document.querySelectorAll("*").forEach(el => {
+      if (el.children.length !== 0) return;
+      const texto = (el.textContent || "").trim();
+      if (/^meus atendimentos$/i.test(texto)) el.textContent = "MEUS AGENDAMENTOS";
+      if (/^veja seu histórico de atendimentos\.?$/i.test(texto)) el.textContent = "Veja seus horários agendados e seu histórico.";
+    });
+  };
+
+  substituirTexto();
+  setTimeout(substituirTexto, 500);
+
+  document.addEventListener("click", event => {
+    const alvo = event.target.closest("article,button,a,div,section");
+    if (!alvo) return;
+    const texto = (alvo.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+
+    if (texto.includes("meus agendamentos") || texto.includes("meus atendimentos")) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      abrirMeusAgendamentos();
+      return;
+    }
+
+    if (texto.includes("avisos e novidades")) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      abrirAvisosNovidades();
+    }
+  }, true);
+}
+
 /* ===== CORREÇÕES FINAIS DA ÁREA VIP ===== */
 
 // O botão "ENTRAR NA ÁREA VIP" da abertura deve abrir login/cadastro,
@@ -1307,5 +1509,7 @@ if (_adminSalvarPontosOriginal) {
 
 corrigirEntradaAreaVIP();
 configurarMeusDados();
+configurarMeusAgendamentosEAvisos();
 manterPontosVIPAtualizados();
+carregarAvisosPublicos();
 
