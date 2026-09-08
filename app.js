@@ -127,6 +127,7 @@ let SERVICES = [
 
 const grid = document.getElementById("servicesGrid");
 const galleryGrid = document.getElementById("galleryGrid");
+let PROMOCOES_ATIVAS = [];
 
 const money = value =>
   value.toLocaleString("pt-BR", {
@@ -139,51 +140,41 @@ function renderServices() {
 
   grid.innerHTML = SERVICES.map((service, index) => {
     const [name, price, description, images] = service;
+    const promo = PROMOCOES_ATIVAS.find(p =>
+      String(p.servico || "").trim().toLowerCase() === String(name).trim().toLowerCase()
+    );
+    const promoPrice = promo && promo.preco_promocional != null ? Number(promo.preco_promocional) : null;
+    const temPromocao = Number.isFinite(promoPrice) && promoPrice >= 0 && promoPrice < Number(price);
 
     return `
       <article class="service-card">
-
         ${
           images.length
             ? `
               <div class="service-images">
-                ${images
-                  .map(
-                    image => `
-                      <img
-                        src="${image}"
-                        alt="${name}"
-                        loading="lazy"
-                      >
-                    `
-                  )
-                  .join("")}
+                ${images.map(image => `
+                  <img src="${image}" alt="${name}" loading="lazy">
+                `).join("")}
               </div>
             `
             : ""
         }
 
         <div class="service-content">
-
           <h3>${name}</h3>
-
           <p>${description}</p>
 
           <div class="service-bottom">
+            <div class="service-price-wrap">
+              ${temPromocao
+                ? `<del style="display:block;font-size:16px;line-height:1.1;opacity:.7;">${money(Number(price))}</del>
+                   <strong style="display:block;margin-top:3px;">${money(promoPrice)}</strong>`
+                : `<strong>${money(Number(price))}</strong>`}
+            </div>
 
-            <strong>${money(price)}</strong>
-
-            <button
-              class="primary small"
-              onclick="openBooking(${index})"
-            >
-              Agendar
-            </button>
-
+            <button class="primary small" onclick="openBooking(${index})">Agendar</button>
           </div>
-
         </div>
-
       </article>
     `;
   }).join("");
@@ -855,17 +846,36 @@ async function renderAdminFotos() {
 }
 
 window.adminAdicionarPromocao = async function () {
-  const titulo = document.getElementById("promoTitulo")?.value.trim();
-  const descricao = document.getElementById("promoDescricao")?.value.trim();
+  const servico = document.getElementById("promoServico")?.value || "";
   const preco = document.getElementById("promoPreco")?.value;
   const inicio = document.getElementById("promoInicio")?.value || null;
   const fim = document.getElementById("promoFim")?.value || null;
-  if (!titulo) return alert("Informe o título da promoção.");
+  if (!servico) return alert("Escolha o serviço que ficará em promoção.");
+  if (preco === "" || !Number.isFinite(Number(preco))) return alert("Informe o valor promocional.");
+
+  const servicoBase = SERVICES.find(s => s[0] === servico);
+  const precoOriginal = Number(servicoBase?.[1] || 0);
+  const precoPromocional = Number(preco);
+  if (precoPromocional >= precoOriginal) {
+    return alert(`O valor promocional deve ser menor que o preço original de ${money(precoOriginal)}.`);
+  }
+
+  const titulo = `Promoção — ${servico}`;
+  const descricao = `De ${money(precoOriginal)} por ${money(precoPromocional)}`;
   const client = adminClient();
-  const { error } = await client.from("promocoes").insert({ titulo, descricao, preco_promocional: preco === "" ? null : Number(preco), data_inicio: inicio, data_fim: fim, ativo: true });
-  if (error) return alert("Não foi possível criar a promoção.");
+  const { error } = await client.from("promocoes").insert({
+    titulo,
+    descricao,
+    servico,
+    preco_promocional: precoPromocional,
+    data_inicio: inicio,
+    data_fim: fim,
+    ativo: true
+  });
+  if (error) return alert("Não foi possível criar a promoção. Verifique se a coluna do serviço foi criada no Supabase.");
   alert("Promoção criada! 💗");
   renderAdminPromocoes();
+  await carregarPromocoesPublicas();
 };
 
 window.adminDesativarPromocao = async function (id) {
@@ -873,24 +883,66 @@ window.adminDesativarPromocao = async function (id) {
   const { error } = await client.from("promocoes").update({ ativo:false }).eq("id", id);
   if (error) return alert("Não foi possível desativar a promoção.");
   renderAdminPromocoes();
+  await carregarPromocoesPublicas();
 };
 
 async function renderAdminPromocoes() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
   conteudo.innerHTML = `<h3>🎀 Promoções</h3>
-    <input id="promoTitulo" placeholder="Título da promoção">
-    <input id="promoDescricao" placeholder="Descrição">
-    <input id="promoPreco" type="number" step="0.01" placeholder="Preço promocional">
+    <p>Escolha o serviço, informe o valor promocional e mantenha as datas como preferir.</p>
+    <select id="promoServico">
+      <option value="">Escolha o serviço</option>
+      ${SERVICES.map(s => `<option value="${s[0]}">${s[0]} — ${money(Number(s[1]))}</option>`).join("")}
+    </select>
+    <input id="promoPreco" type="number" step="0.01" min="0" placeholder="Valor da promoção">
     <label>Início<input id="promoInicio" type="date"></label>
     <label>Fim<input id="promoFim" type="date"></label>
     <button class="primary small" onclick="adminAdicionarPromocao()">Criar promoção</button>
     <div id="listaPromosAdmin" style="margin-top:18px">Carregando...</div>`;
+
   const client = adminClient();
-  const { data, error } = await client.from("promocoes").select("id,titulo,descricao,preco_promocional,data_inicio,data_fim,ativo").order("created_at", {ascending:false});
-  if (error) { document.getElementById("listaPromosAdmin").textContent = "Não foi possível carregar as promoções."; return; }
+  const { data, error } = await client.from("promocoes")
+    .select("id,titulo,descricao,servico,preco_promocional,data_inicio,data_fim,ativo")
+    .order("id", {ascending:false});
+  if (error) {
+    document.getElementById("listaPromosAdmin").textContent = "Não foi possível carregar as promoções.";
+    return;
+  }
   document.getElementById("listaPromosAdmin").innerHTML = (data || []).map(r => `
-    <div style="padding:12px;border-bottom:1px solid #eee;"><strong>${r.titulo}</strong><br>${r.descricao || ""}${r.preco_promocional != null ? `<br>${money(Number(r.preco_promocional))}` : ""}<br>Status: ${r.ativo ? "Ativa" : "Inativa"} ${r.ativo ? `<button class="primary small" onclick="adminDesativarPromocao(${r.id})">Desativar</button>` : ""}</div>`).join("") || "Nenhuma promoção cadastrada.";
+    <div style="padding:12px;border-bottom:1px solid #eee;">
+      <strong>${r.servico || r.titulo}</strong><br>
+      ${r.servico ? `Preço original: ${money(Number(SERVICES.find(s => s[0] === r.servico)?.[1] || 0))}<br>` : ""}
+      ${r.preco_promocional != null ? `Promoção: ${money(Number(r.preco_promocional))}<br>` : ""}
+      ${r.data_inicio ? `Início: ${r.data_inicio}<br>` : ""}
+      ${r.data_fim ? `Fim: ${r.data_fim}<br>` : ""}
+      Status: ${r.ativo ? "Ativa" : "Inativa"}
+      ${r.ativo ? `<button class="primary small" onclick="adminDesativarPromocao(${r.id})">Desativar</button>` : ""}
+    </div>`).join("") || "Nenhuma promoção cadastrada.";
+}
+
+async function carregarPromocoesPublicas() {
+  try {
+    const client = adminClient();
+    const hoje = new Date().toISOString().slice(0, 10);
+    const { data, error } = await client.from("promocoes")
+      .select("id,servico,preco_promocional,data_inicio,data_fim,ativo")
+      .eq("ativo", true);
+    if (error) {
+      console.warn("Não foi possível carregar as promoções públicas.", error);
+      PROMOCOES_ATIVAS = [];
+      renderServices();
+      return;
+    }
+    PROMOCOES_ATIVAS = (data || []).filter(p => {
+      const inicioOk = !p.data_inicio || p.data_inicio <= hoje;
+      const fimOk = !p.data_fim || p.data_fim >= hoje;
+      return inicioOk && fimOk && p.servico && p.preco_promocional != null;
+    });
+    renderServices();
+  } catch (e) {
+    console.warn("Erro ao carregar promoções públicas.", e);
+  }
 }
 
 window.adminSalvarPontos = async function (clienteId, vipId) {
@@ -1077,7 +1129,7 @@ function configurarDetalhesVIP() {
 
     if (texto.includes("promoções")) {
       event.preventDefault();
-      adminClient().from("promocoes").select("titulo,descricao,preco_promocional,data_inicio,data_fim").eq("ativo",true).order("created_at",{ascending:false}).then(({data,error})=>{
+      adminClient().from("promocoes").select("titulo,descricao,servico,preco_promocional,data_inicio,data_fim").eq("ativo",true).order("id",{ascending:false}).then(({data,error})=>{
         if(error){ console.error(error); return; }
         showModal(`
           <h2>Promoções 🎀</h2>
@@ -1085,7 +1137,7 @@ function configurarDetalhesVIP() {
             <div class="promo-item">
               <h3>${p.titulo}</h3>
               <p>${p.descricao || ""}</p>
-              ${p.preco_promocional != null ? `<strong>${money(Number(p.preco_promocional))}</strong>` : ""}
+              ${p.servico && p.preco_promocional != null ? `<p><del>${money(Number(SERVICES.find(s => s[0] === p.servico)?.[1] || 0))}</del> <strong>${money(Number(p.preco_promocional))}</strong></p>` : (p.preco_promocional != null ? `<strong>${money(Number(p.preco_promocional))}</strong>` : "")}
             </div>
           `).join("") : `<p class="muted">No momento não há promoções cadastradas.</p>`}
           <button class="primary full" onclick="closeModal()">Fechar</button>
@@ -1155,6 +1207,7 @@ configurarDetalhesVIP();
 restaurarTudoAoAbrir();
 
 carregarPrecosPublicos();
+carregarPromocoesPublicas();
 
 /* ===== CORREÇÕES FINAIS DA ÁREA VIP ===== */
 
