@@ -1156,3 +1156,86 @@ configurarDetalhesVIP();
 restaurarTudoAoAbrir();
 
 carregarPrecosPublicos();
+
+/* ===== CORREÇÕES FINAIS DA ÁREA VIP ===== */
+
+// O botão "ENTRAR NA ÁREA VIP" da abertura deve abrir login/cadastro,
+// nunca o formulário de agendamento.
+function corrigirEntradaAreaVIP() {
+  document.addEventListener("click", event => {
+    const alvo = event.target.closest("button, a, [role='button']");
+    if (!alvo) return;
+    const texto = (alvo.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+    if (texto.includes("entrar na área vip")) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      openVipModal();
+    }
+  }, true);
+}
+
+// Mostra os dados reais da cliente logada no botão MEUS DADOS.
+async function abrirMeusDados() {
+  const { user, cliente } = await getCurrentClient();
+  if (!user || !cliente) {
+    openVipModal();
+    return;
+  }
+
+  showModal(`
+    <h2>Meus dados 💗</h2>
+    <p><strong>Nome</strong><br>${cliente.nome || "Não informado"}</p>
+    <p><strong>WhatsApp</strong><br>${cliente.whatsapp || "Não informado"}</p>
+    <p><strong>E-mail</strong><br>${cliente.email || user.email || "Não informado"}</p>
+    <button class="primary full" onclick="closeModal()">Fechar</button>
+  `);
+}
+
+function configurarMeusDados() {
+  document.addEventListener("click", event => {
+    const alvo = event.target.closest("button, a, [role='button']");
+    if (!alvo) return;
+    const texto = (alvo.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+    if (texto.includes("meus dados")) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      abrirMeusDados();
+    }
+  }, true);
+}
+
+// Atualiza o cartão e os pontos quando a cliente volta para a página.
+async function atualizarVIPDaClienteAtual() {
+  try {
+    const { user, cliente } = await getCurrentClient();
+    if (!user || !cliente) return;
+    await carregarDadosVIP(cliente);
+  } catch (error) {
+    console.warn("Não foi possível atualizar os pontos VIP.", error);
+  }
+}
+
+function manterPontosVIPAtualizados() {
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") atualizarVIPDaClienteAtual();
+  });
+  window.addEventListener("focus", atualizarVIPDaClienteAtual);
+  // Atualiza periodicamente enquanto a cliente deixa o site aberto.
+  setInterval(() => {
+    if (document.visibilityState === "visible") atualizarVIPDaClienteAtual();
+  }, 15000);
+}
+
+// Reforça a atualização do cartão depois de qualquer alteração feita no painel.
+const _adminSalvarPontosOriginal = window.adminSalvarPontos;
+if (_adminSalvarPontosOriginal) {
+  window.adminSalvarPontos = async function (...args) {
+    const resultado = await _adminSalvarPontosOriginal(...args);
+    return resultado;
+  };
+}
+
+corrigirEntradaAreaVIP();
+configurarMeusDados();
+manterPontosVIPAtualizados();
+
