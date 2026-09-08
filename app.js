@@ -712,7 +712,7 @@ function adminBotoes() {
       <button class="primary small" onclick="abrirAdminAba('promocoes')">🎀 Promoções</button>
       <button class="primary small" onclick="abrirAdminAba('vip')">⭐ VIP Fidelidade</button>
       <button class="primary small" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
-      <button class="primary small" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
+      <button class="primary small" data-admin-aba="avisos" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
     </div>
   `;
 }
@@ -1090,16 +1090,29 @@ window.abrirAdminAba = async function (aba) {
   if (!conteudo) return;
   const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", agendamentos:"📋 Agendamentos", avisos:"📢 Avisos e Novidades" };
   const container = area.querySelector(".admin-container") || area;
-  if (!container.querySelector(".admin-tabs")) {
-    const atual = document.getElementById("adminConteudo");
+  const atual = document.getElementById("adminConteudo");
+  let tabs = container.querySelector(".admin-tabs");
+  if (!tabs) {
     if (atual && atual.parentElement === container) {
       atual.insertAdjacentHTML("beforebegin", adminBotoes());
     } else {
       container.insertAdjacentHTML("beforeend", adminBotoes());
     }
+    tabs = container.querySelector(".admin-tabs");
   }
 
-  let atual = document.getElementById("adminConteudo");
+  // O HTML antigo já possui uma barra de abas. Nesse caso, acrescenta
+  // APENAS a aba de Avisos e Novidades, sem duplicar nem alterar as outras.
+  if (tabs && !tabs.querySelector("[data-admin-aba='avisos']")) {
+    const botaoAvisos = document.createElement("button");
+    botaoAvisos.type = "button";
+    botaoAvisos.className = "primary small";
+    botaoAvisos.setAttribute("data-admin-aba", "avisos");
+    botaoAvisos.textContent = "📢 Avisos e Novidades";
+    botaoAvisos.addEventListener("click", () => window.abrirAdminAba("avisos"));
+    tabs.appendChild(botaoAvisos);
+  }
+
   if (!atual) {
     atual = document.createElement("div");
     atual.id = "adminConteudo";
@@ -1380,16 +1393,19 @@ function abrirAvisosNovidades() {
 
 function configurarMeusAgendamentosEAvisos() {
   const substituirTexto = () => {
-    document.querySelectorAll("*").forEach(el => {
-      if (el.children.length !== 0) return;
-      const texto = (el.textContent || "").trim();
-      if (/^meus atendimentos$/i.test(texto)) el.textContent = "MEUS AGENDAMENTOS";
-      if (/^veja seu histórico de atendimentos\.?$/i.test(texto)) el.textContent = "Veja seus horários agendados e seu histórico.";
+    // Corrige somente os textos do cartão, sem alterar o restante do layout.
+    document.querySelectorAll("h1,h2,h3,h4,h5,h6,p,span,strong,small,div,a,button").forEach(el => {
+      const texto = (el.textContent || "").replace(/\s+/g, " ").trim();
+      if (/^meus atendimentos$/i.test(texto)) {
+        el.textContent = "MEUS AGENDAMENTOS";
+      } else if (/^veja seu histórico de atendimentos\.?$/i.test(texto)) {
+        el.textContent = "Veja seus horários agendados e seu histórico.";
+      }
     });
   };
 
   substituirTexto();
-  setTimeout(substituirTexto, 500);
+  [300, 800, 1500, 3000].forEach(ms => setTimeout(substituirTexto, ms));
 
   document.addEventListener("click", event => {
     const alvo = event.target.closest("article,button,a,div,section");
