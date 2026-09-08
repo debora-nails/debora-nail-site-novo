@@ -1014,6 +1014,8 @@ function atualizarCartaoVIP(pontos, vip) {
     ".vip-points .point",
     ".fidelity-point",
     ".fidelidade-point",
+    ".loyalty-point",
+    ".loyalty-points .loyalty-point",
     "[data-vip-point]",
     "[data-point]"
   ];
@@ -1028,9 +1030,7 @@ function atualizarCartaoVIP(pontos, vip) {
     const ativo = index < quantidade;
     el.classList.toggle("is-completed", ativo);
     el.setAttribute("aria-label", ativo ? `Ponto ${index + 1} conquistado` : `Ponto ${index + 1} disponível`);
-    if (ativo) {
-      el.innerHTML = "💅";
-    }
+    el.innerHTML = ativo ? "💅" : "";
   });
 
   if (quantidade >= 10) {
@@ -1162,12 +1162,23 @@ carregarPrecosPublicos();
 // O botão "ENTRAR NA ÁREA VIP" da abertura deve abrir login/cadastro,
 // nunca o formulário de agendamento.
 function corrigirEntradaAreaVIP() {
-  // Corrige somente o botão da entrada principal (#loginBtn).
-  // Não intercepta o botão "ENTRAR NA ÁREA VIP" que existe dentro do próprio modal,
-  // pois esse botão precisa executar vipLogin().
+  // Botão da navegação: abre login/cadastro.
   const botaoEntrada = document.getElementById("loginBtn");
   if (botaoEntrada) {
     botaoEntrada.onclick = function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      openVipModal();
+      return false;
+    };
+  }
+
+  // Botão grande do início: também abre login/cadastro.
+  // O HTML antigo chamava openBooking() diretamente, por isso ele estava
+  // abrindo o agendamento quando deveria abrir a Área VIP.
+  const botaoHero = document.querySelector(".hero-button");
+  if (botaoHero) {
+    botaoHero.onclick = function (event) {
       event.preventDefault();
       event.stopPropagation();
       openVipModal();
