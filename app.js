@@ -1180,36 +1180,85 @@ async function renderAdminAvisos() {
 async function renderAdminAgendamentos() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
-  conteudo.innerHTML = `<h3>📋 Agendamentos</h3><p class="muted">Acompanhe os horários e registre o resultado de cada atendimento.</p><div id="listaAgendamentosAdmin">Carregando...</div>`;
-  const client = adminClient();
-  const { data, error } = await client.from("agendamentos").select("id,cliente_id,servico,data,horario,status,forma_pagamento,troco_para,troco,pagamento_status").order("data", {ascending:false}).order("horario", {ascending:false});
-  if (error) { document.getElementById("listaAgendamentosAdmin").textContent = "Não foi possível carregar os agendamentos."; return; }
-  const ids = [...new Set((data || []).map(a => a.cliente_id).filter(Boolean))];
-  let clientes = [];
-  if (ids.length) { const r = await client.from("Clientes").select("id,nome,whatsapp").in("id", ids); clientes = r.data || []; }
-  const cm = new Map(clientes.map(c => [c.id, c]));
-  const pagamentos = {pix:"Pix",dinheiro:"Dinheiro",debito:"Cartão de débito",credito:"Cartão de crédito",pagar_depois:"Pagar depois"};
-  const statusLabel = s => ({confirmado:"Confirmado",agendado:"Agendado",realizado:"Realizado",cancelado:"Cancelado",faltou:"Faltou"}[String(s||"").toLowerCase()] || s || "Agendado");
-  document.getElementById("listaAgendamentosAdmin").innerHTML = (data || []).map(a => {
-    const c = cm.get(a.cliente_id);
-    const pagamento = pagamentos[a.forma_pagamento] || "Não informado";
-    const trocoInfo = a.forma_pagamento === "dinheiro" && a.troco_para ? `<br>Troco para: ${money(a.troco_para)}${a.troco != null ? ` — Troco: ${money(a.troco)}` : ""}` : "";
-    const podeFechar = !["cancelado","faltou"].includes(String(a.status||"").toLowerCase());
-    return `<div style="padding:14px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
-      <strong>📅 ${a.data} — ${String(a.horario).slice(0,5)}</strong>
-      <div style="margin-top:6px;">💅 ${escapeHtml(a.servico)}</div>
-      <div>👤 ${escapeHtml(c?.nome || "Cliente")} ${c?.whatsapp ? `— ${escapeHtml(c.whatsapp)}` : ""}</div>
-      <div>Status: <strong>${escapeHtml(statusLabel(a.status))}</strong></div>
-      <div>Pagamento: ${escapeHtml(pagamento)} — ${escapeHtml(a.pagamento_status || "pendente")}${trocoInfo}</div>
-      ${podeFechar ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
-        <button class="primary small" onclick="adminMarcarAgendamento(${a.id},'realizado')">✅ Realizado</button>
-        <button class="secondary small" onclick="adminMarcarAgendamento(${a.id},'faltou')">⚠️ Faltou</button>
-        <button class="secondary small" onclick="adminMarcarAgendamento(${a.id},'cancelado')">❌ Cancelar</button>
-      </div>` : ""}
-    </div>`;
-  }).join("") || "Nenhum agendamento cadastrado.";
-}
 
+  conteudo.innerHTML = `<h3>📋 Agendamentos</h3><p class="muted">Acompanhe os horários e registre o resultado de cada atendimento.</p><div id="listaAgendamentosAdmin">Carregando...</div>`;
+  const lista = document.getElementById("listaAgendamentosAdmin");
+
+  try {
+    const client = adminClient();
+    // Usa todas as colunas para não quebrar caso alguma coluna opcional ainda não exista.
+    const resultado = await client
+      .from("agendamentos")
+      .select("*")
+      .order("data", { ascending: false })
+      .order("horario", { ascending: false });
+
+    if (resultado.error) {
+      console.error("Erro ao carregar agendamentos:", resultado.error);
+      if (lista) lista.innerHTML = `<p>Não foi possível carregar os agendamentos.</p><small>${escapeHtml(resultado.error.message || "Erro desconhecido")}</small>`;
+      return;
+    }
+
+    const data = resultado.data || [];
+    const ids = [...new Set(data.map(a => a.cliente_id).filter(Boolean))];
+    let clientes = [];
+
+    if (ids.length) {
+      const r = await client.from("Clientes").select("id,nome,whatsapp").in("id", ids);
+      if (r.error) {
+        console.error("Erro ao carregar clientes dos agendamentos:", r.error);
+      } else {
+        clientes = r.data || [];
+      }
+    }
+
+    const cm = new Map(clientes.map(c => [c.id, c]));
+    const pagamentos = {
+      pix: "Pix",
+      dinheiro: "Dinheiro",
+      debito: "Cartão de débito",
+      credito: "Cartão de crédito",
+      pagar_depois: "Pagar depois"
+    };
+    const statusLabel = s => ({
+      confirmado: "Confirmado",
+      agendado: "Agendado",
+      realizado: "Realizado",
+      cancelado: "Cancelado",
+      faltou: "Faltou"
+    }[String(s || "").toLowerCase()] || s || "Agendado");
+
+    if (!data.length) {
+      lista.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;">Nenhum agendamento cadastrado ainda. 💗</div>`;
+      return;
+    }
+
+    lista.innerHTML = data.map(a => {
+      const c = cm.get(a.cliente_id);
+      const pagamento = pagamentos[a.forma_pagamento] || "Não informado";
+      const trocoInfo = a.forma_pagamento === "dinheiro" && a.troco_para != null
+        ? `<br>Troco para: ${money(Number(a.troco_para))}${a.troco != null ? ` — Troco: ${money(Number(a.troco))}` : ""}`
+        : "";
+      const podeFechar = !["cancelado", "faltou", "realizado"].includes(String(a.status || "").toLowerCase());
+
+      return `<div style="padding:14px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
+        <strong>📅 ${escapeHtml(String(a.data || ""))} — ${escapeHtml(String(a.horario || "").slice(0,5))}</strong>
+        <div style="margin-top:6px;">💅 ${escapeHtml(a.servico || "Serviço não informado")}</div>
+        <div>👤 ${escapeHtml(c?.nome || "Cliente")}${c?.whatsapp ? ` — ${escapeHtml(c.whatsapp)}` : ""}</div>
+        <div>Status: <strong>${escapeHtml(statusLabel(a.status))}</strong></div>
+        <div>Pagamento: ${escapeHtml(pagamento)} — ${escapeHtml(a.pagamento_status || "pendente")}${trocoInfo}</div>
+        ${podeFechar ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
+          <button class="primary small" onclick="adminMarcarAgendamento(${Number(a.id)},'realizado')">✅ Realizado</button>
+          <button class="secondary small" onclick="adminMarcarAgendamento(${Number(a.id)},'faltou')">⚠️ Faltou</button>
+          <button class="secondary small" onclick="adminMarcarAgendamento(${Number(a.id)},'cancelado')">❌ Cancelar</button>
+        </div>` : ""}
+      </div>`;
+    }).join("");
+  } catch (e) {
+    console.error("Falha inesperada ao abrir Agendamentos:", e);
+    if (lista) lista.innerHTML = `<p>Não foi possível carregar os agendamentos.</p><small>Verifique o console se o problema continuar.</small>`;
+  }
+}
 window.adminMarcarAgendamento = async function(id, status) {
   const nomes = {realizado:"concluir este atendimento como realizado", faltou:"marcar este atendimento como falta", cancelado:"cancelar este agendamento"};
   if (!confirm(`Deseja ${nomes[status] || "alterar o status"}?`)) return;
