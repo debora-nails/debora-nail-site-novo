@@ -1421,7 +1421,12 @@ function configurarMeusAgendamentosEAvisos() {
       return;
     }
 
+    // O botão dentro da Área da Débora deve abrir o EDITOR administrativo.
+    // Somente os cartões/links públicos de "Avisos e Novidades" abrem a visualização.
     if (texto.includes("avisos e novidades")) {
+      const botaoAdminAvisos = event.target.closest("[data-admin-aba='avisos']");
+      if (botaoAdminAvisos) return;
+
       event.preventDefault();
       event.stopImmediatePropagation();
       abrirAvisosNovidades();
