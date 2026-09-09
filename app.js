@@ -1236,68 +1236,118 @@ async function renderAdminAvisos() {
 async function renderAdminDiagnostico() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
+
   conteudo.innerHTML = `
     <h3>🔎 Diagnóstico do site</h3>
     <p class="muted">O próprio site vai verificar onde Clientes e Agendamentos estão travando. Não altera clientes, agendamentos ou financeiro.</p>
+    <button type="button" id="btnExecutarDiagnostico" class="primary small" style="margin:10px 0;">▶️ Executar diagnóstico agora</button>
     <div id="diagnosticoAdmin" style="display:grid;gap:10px;margin-top:14px;"></div>
   `;
+
   const box = document.getElementById("diagnosticoAdmin");
-  const inicio = Date.now();
-  const resultados = [];
-  const mostrar = () => {
-    box.innerHTML = resultados.map(r => `<div style="padding:13px 15px;border:1px solid #ead7df;border-radius:14px;background:#fff;">
-      <strong>${r.ok ? "✅" : "❌"} ${escapeHtml(r.titulo)}</strong>
-      <div style="margin-top:5px;white-space:pre-wrap;">${escapeHtml(r.msg)}</div>
-    </div>`).join("") + `<p class="muted">Diagnóstico concluído em ${Date.now()-inicio} ms.</p>`;
-  };
-  const add = (ok,titulo,msg) => { resultados.push({ok,titulo,msg}); mostrar(); };
-  try {
-    const client = adminClient();
-    const { data: sessionData, error: sessionError } = await client.auth.getSession();
-    const user = sessionData?.session?.user;
-    if (sessionError) add(false,"Sessão",sessionError.message || "Erro ao verificar sessão.");
-    else if (!user) add(false,"Sessão","Nenhuma sessão autenticada encontrada.");
-    else add(true,"Sessão","Usuária autenticada: " + (user.email || user.id));
+  const botao = document.getElementById("btnExecutarDiagnostico");
+  if (!box) return;
 
-    const admin = await client.rpc("usuario_atual_e_admin");
-    if (admin.error) add(false,"Acesso de administradora",admin.error.message || "Erro na função usuario_atual_e_admin.");
-    else add(admin.data === true,"Acesso de administradora",admin.data === true ? "Administradora reconhecida." : "Usuária autenticada, mas não reconhecida como administradora.");
+  const executar = async () => {
+    box.innerHTML = "<div style=\"padding:14px;border:1px solid #ead7df;border-radius:14px;background:#fff;\">⏳ Iniciando diagnóstico...</div>";
+    if (botao) { botao.disabled = true; botao.textContent = "⏳ Diagnosticando..."; }
 
-    const testarRPC = async (nome, limite=7000) => {
-      const t0 = Date.now();
-      let timer;
-      try {
-        const promessa = client.rpc(nome);
-        const timeout = new Promise((_, reject) => { timer=setTimeout(() => reject(new Error("TIMEOUT: a função não respondeu em 7 segundos")), limite); });
-        const r = await Promise.race([promessa, timeout]);
-        clearTimeout(timer);
-        return { ...r, ms: Date.now()-t0 };
-      } catch(e) { clearTimeout(timer); return { data:null, error:e, ms:Date.now()-t0 }; }
+    const inicio = Date.now();
+    const resultados = [];
+
+    const mostrar = () => {
+      box.innerHTML = "";
+      resultados.forEach(r => {
+        const card = document.createElement("div");
+        card.style.cssText = "padding:13px 15px;border:1px solid #ead7df;border-radius:14px;background:#fff;";
+        const titulo = document.createElement("strong");
+        titulo.textContent = (r.ok ? "✅ " : "❌ ") + r.titulo;
+        const msg = document.createElement("div");
+        msg.style.marginTop = "5px";
+        msg.style.whiteSpace = "pre-wrap";
+        msg.textContent = r.msg;
+        card.appendChild(titulo);
+        card.appendChild(msg);
+        box.appendChild(card);
+      });
+      const fim = document.createElement("p");
+      fim.className = "muted";
+      fim.textContent = `Diagnóstico concluído em ${Date.now() - inicio} ms.`;
+      box.appendChild(fim);
     };
 
-    const clientes = await testarRPC("admin_listar_clientes");
-    if (clientes.error) add(false,"RPC Clientes",`${clientes.error.message || clientes.error}
-Tempo: ${clientes.ms} ms`);
-    else add(true,"RPC Clientes",`Resposta recebida em ${clientes.ms} ms. Tipo: ${Array.isArray(clientes.data) ? "lista" : typeof clientes.data}. Registros: ${Array.isArray(clientes.data) ? clientes.data.length : "formato não-lista"}.`);
+    const add = (ok, titulo, msg) => {
+      resultados.push({ ok, titulo, msg });
+      mostrar();
+    };
 
-    const ag = await testarRPC("admin_listar_agendamentos");
-    if (ag.error) add(false,"RPC Agendamentos",`${ag.error.message || ag.error}
-Tempo: ${ag.ms} ms`);
-    else {
-      const tipo = Array.isArray(ag.data) ? "lista" : typeof ag.data;
-      const qtd = Array.isArray(ag.data) ? ag.data.length : (Array.isArray(ag.data?.agendamentos) ? ag.data.agendamentos.length : "formato desconhecido");
-      add(true,"RPC Agendamentos",`Resposta recebida em ${ag.ms} ms. Tipo: ${tipo}. Registros: ${qtd}.`);
-    }
+    try {
+      if (!window.supabase || !window.SUPABASE_CONFIG) {
+        add(false, "Configuração", "Supabase ou SUPABASE_CONFIG não está disponível nesta página.");
+        return;
+      }
 
-    const versao = await client.rpc("admin_listar_agendamentos");
-    if (!versao.error) {
-      const formatoNovo = Array.isArray(versao.data);
-      const formatoAntigo = versao.data && Array.isArray(versao.data.agendamentos);
-      add(formatoNovo || formatoAntigo,"Formato dos Agendamentos",formatoNovo ? "Formato atual: lista de agendamentos." : formatoAntigo ? "Formato antigo: objeto com agendamentos." : "Formato inesperado retornado pelo banco.");
+      const client = adminClient();
+      add(true, "Diagnóstico iniciado", "Conexão com o Supabase criada. Agora serão testados sessão, acesso de administradora, Clientes e Agendamentos.");
+
+      const { data: sessionData, error: sessionError } = await client.auth.getSession();
+      const user = sessionData?.session?.user;
+      if (sessionError) add(false, "Sessão", sessionError.message || "Erro ao verificar sessão.");
+      else if (!user) add(false, "Sessão", "Nenhuma sessão autenticada encontrada.");
+      else add(true, "Sessão", "Usuária autenticada: " + (user.email || user.id));
+
+      const admin = await client.rpc("usuario_atual_e_admin");
+      if (admin.error) add(false, "Acesso de administradora", admin.error.message || "Erro na função usuario_atual_e_admin.");
+      else add(admin.data === true, "Acesso de administradora", admin.data === true ? "Administradora reconhecida." : "Usuária autenticada, mas não reconhecida como administradora.");
+
+      const testarRPC = async (nome, limite = 7000) => {
+        const t0 = Date.now();
+        let timer = null;
+        try {
+          const promessa = client.rpc(nome);
+          const timeout = new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error("TIMEOUT: a função não respondeu em 7 segundos")), limite);
+          });
+          const r = await Promise.race([promessa, timeout]);
+          if (timer) clearTimeout(timer);
+          return { ...r, ms: Date.now() - t0 };
+        } catch (e) {
+          if (timer) clearTimeout(timer);
+          return { data: null, error: e, ms: Date.now() - t0 };
+        }
+      };
+
+      const clientes = await testarRPC("admin_listar_clientes");
+      if (clientes.error) {
+        add(false, "RPC Clientes", `${clientes.error.message || clientes.error}\nTempo: ${clientes.ms} ms`);
+      } else {
+        const tipo = Array.isArray(clientes.data) ? "lista" : typeof clientes.data;
+        const qtd = Array.isArray(clientes.data) ? clientes.data.length : "formato não-lista";
+        add(true, "RPC Clientes", `Resposta recebida em ${clientes.ms} ms. Tipo: ${tipo}. Registros: ${qtd}.`);
+      }
+
+      const ag = await testarRPC("admin_listar_agendamentos");
+      if (ag.error) {
+        add(false, "RPC Agendamentos", `${ag.error.message || ag.error}\nTempo: ${ag.ms} ms`);
+      } else {
+        const tipo = Array.isArray(ag.data) ? "lista" : typeof ag.data;
+        const qtd = Array.isArray(ag.data)
+          ? ag.data.length
+          : (Array.isArray(ag.data?.agendamentos) ? ag.data.agendamentos.length : "formato desconhecido");
+        add(true, "RPC Agendamentos", `Resposta recebida em ${ag.ms} ms. Tipo: ${tipo}. Registros: ${qtd}.`);
+        const formatoNovo = Array.isArray(ag.data);
+        const formatoAntigo = !!(ag.data && Array.isArray(ag.data.agendamentos));
+        add(formatoNovo || formatoAntigo, "Formato dos Agendamentos", formatoNovo ? "Formato atual: lista de agendamentos." : formatoAntigo ? "Formato antigo: objeto com agendamentos." : "Formato inesperado retornado pelo banco.");
+      }
+    } catch (e) {
+      add(false, "Erro geral do diagnóstico", e?.message || String(e));
+    } finally {
+      if (botao) { botao.disabled = false; botao.textContent = "🔄 Executar diagnóstico novamente"; }
     }
-  } catch (e) {
-    add(false,"Erro geral do diagnóstico",e?.message || String(e));
-  }
+  };
+
+  if (botao) botao.addEventListener("click", executar);
+  executar();
 }
 
 async function renderAdminAgendamentos() {
