@@ -840,6 +840,7 @@ function adminBotoes() {
       <button class="primary small" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
       <button class="primary small" data-admin-aba="financeiro" onclick="abrirAdminAba('financeiro')">💰 Financeiro</button>
       <button class="primary small" data-admin-aba="avisos" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
+      <button class="primary small" data-admin-aba="diagnostico" onclick="abrirAdminAba('diagnostico')">🔎 Diagnóstico</button>
     </div>
   `;
 }
@@ -1084,21 +1085,13 @@ async function renderAdminClientes() {
   const lista = document.getElementById("listaClientesAdmin");
   try {
     const client = adminClient();
-    // Leitura direta da tabela. A RPC antiga podia ficar presa e deixar
-    // o painel eternamente em "Carregando...".
-    const { data, error } = await client
-      .from("Clientes")
-      .select("id,nome,whatsapp,email,is_admin,permite_pagamento_posterior")
-      .order("nome");
-
+    const { data, error } = await client.rpc("admin_listar_clientes");
     if (error) throw error;
     const clientes = Array.isArray(data) ? data : [];
-
     if (!clientes.length) {
       lista.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;">Ainda não há clientes cadastradas. 💗</div>`;
       return;
     }
-
     lista.innerHTML = clientes.map(c => `
       <div style="padding:16px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
         <strong>👤 ${escapeHtml(c.nome || "Cliente")}</strong>
@@ -1316,43 +1309,27 @@ async function renderAdminAgendamentos() {
   if (!conteudo) return;
   conteudo.innerHTML = `<h3>📋 Agendamentos</h3><p class="muted">Acompanhe os horários e registre o resultado de cada atendimento.</p><div id="listaAgendamentosAdmin">Carregando...</div>`;
   const lista = document.getElementById("listaAgendamentosAdmin");
-
   try {
     const client = adminClient();
-    // Mesma estratégia usada no painel que já funcionava: leitura direta
-    // das duas tabelas, sem depender da RPC de Agendamentos.
-    const consultas = Promise.all([
-      client.from("agendamentos").select("*").order("data", { ascending: false }).order("horario", { ascending: false }),
-      client.from("Clientes").select("id,nome,whatsapp,email")
-    ]);
-    const timeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("A consulta demorou mais de 10 segundos.")), 10000)
-    );
-    const [agRes, cliRes] = await Promise.race([consultas, timeout]);
-
-    if (agRes.error) throw agRes.error;
-    if (cliRes.error) throw cliRes.error;
-
-    const agendamentos = agRes.data || [];
-    const clientes = cliRes.data || [];
-    const cm = new Map(clientes.map(c => [String(c.id), c]));
+    const { data, error } = await client.rpc("admin_listar_agendamentos");
+    if (error) throw error;
+    const agendamentos = Array.isArray(data) ? data : (Array.isArray(data?.agendamentos) ? data.agendamentos : []);
     const pagamentos = { pix:"Pix", dinheiro:"Dinheiro", debito:"Cartão de débito", credito:"Cartão de crédito", pagar_depois:"Pagar depois" };
     const statusLabel = s => ({ confirmado:"Confirmado", agendado:"Agendado", realizado:"Realizado", cancelado:"Cancelado", faltou:"Faltou" }[String(s || "").toLowerCase()] || s || "Agendado");
-
     if (!agendamentos.length) {
       lista.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;">Nenhum agendamento cadastrado ainda. 💗</div>`;
       return;
     }
-
     lista.innerHTML = agendamentos.map(a => {
-      const c = cm.get(String(a.cliente_id));
       const pagamento = pagamentos[a.forma_pagamento] || "Não informado";
+      const nome = a.cliente_nome || "Cliente";
+      const whatsapp = a.cliente_whatsapp || "";
       const trocoInfo = a.forma_pagamento === "dinheiro" && a.troco_para != null ? `<br>Troco para: ${money(Number(a.troco_para))}${a.troco != null ? ` — Troco: ${money(Number(a.troco))}` : ""}` : "";
       const podeFechar = !["cancelado","faltou","realizado"].includes(String(a.status || "").toLowerCase());
       return `<div style="padding:14px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
         <strong>📅 ${escapeHtml(String(a.data || ""))} — ${escapeHtml(String(a.horario || "").slice(0,5))}</strong>
         <div style="margin-top:6px;">💅 ${escapeHtml(a.servico || "Serviço não informado")}</div>
-        <div>👤 ${escapeHtml(c?.nome || "Cliente")}${c?.whatsapp ? ` — ${escapeHtml(c.whatsapp)}` : ""}</div>
+        <div>👤 ${escapeHtml(nome)}${whatsapp ? ` — ${escapeHtml(whatsapp)}` : ""}</div>
         <div>Status: <strong>${escapeHtml(statusLabel(a.status))}</strong></div>
         <div>Pagamento: ${escapeHtml(pagamento)} — ${escapeHtml(a.pagamento_status || "pendente")}${trocoInfo}</div>
         ${podeFechar ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
@@ -1526,52 +1503,39 @@ window.abrirAdminAba = async function (aba) {
   const resultado = await verificarAdmin();
   if (!resultado.ok) { alert(resultado.message); return; }
   const area = document.getElementById("areaDebora");
-  if (area) area.style.display = "block";
+  if (!area) return;
+  area.style.display = "block";
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
-  const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", clientes:"👥 Clientes", agendamentos:"📋 Agendamentos", financeiro:"💰 Financeiro", avisos:"📢 Avisos e Novidades", diagnostico:"🔎 Diagnóstico" };
   const container = area.querySelector(".admin-container") || area;
 
-  // Remove somente a barra antiga do painel (ex.: “Horários Disponibilidade”).
-  // Isso corrige a duplicação visível sem alterar o site público.
-  const barras = Array.from(container.querySelectorAll(".admin-tabs"));
-  barras.forEach(barra => {
-    const texto = (barra.textContent || "").replace(/\s+/g, " ").trim();
-    if (texto.includes("Horários Disponibilidade") || texto.includes("Preços Procedimentos") || texto.includes("Fotos Galeria") || texto.includes("Promoções Ofertas") || texto.includes("Agendamentos Clientes")) {
-      barra.remove();
-    }
+  // Há uma barra antiga gravada no HTML. Removemos TODAS as barras antigas
+  // da Área da Débora e reconstruímos apenas a barra oficial do app.js.
+  container.querySelectorAll(".admin-tabs").forEach(el => el.remove());
+  container.insertAdjacentHTML("afterbegin", adminBotoes());
+  const tabs = container.querySelector(".admin-tabs");
+  tabs?.querySelectorAll("[data-admin-aba]").forEach(botao => {
+    botao.classList.toggle("active", botao.getAttribute("data-admin-aba") === aba);
   });
 
-  const atual = document.getElementById("adminConteudo");
-  let tabs = container.querySelector(".admin-tabs");
-  if (!tabs) {
-    if (atual && atual.parentElement === container) {
-      atual.insertAdjacentHTML("beforebegin", adminBotoes());
-    } else {
-      container.insertAdjacentHTML("beforeend", adminBotoes());
-    }
-    tabs = container.querySelector(".admin-tabs");
+  const carregadores = {
+    horarios:renderAdminHorarios,
+    precos:renderAdminPrecos,
+    fotos:renderAdminFotos,
+    promocoes:renderAdminPromocoes,
+    vip:renderAdminVip,
+    clientes:renderAdminClientes,
+    agendamentos:renderAdminAgendamentos,
+    financeiro:renderAdminFinanceiro,
+    avisos:renderAdminAvisos,
+    diagnostico:renderAdminDiagnostico
+  };
+  try {
+    await (carregadores[aba] || renderAdminHorarios)();
+  } catch (error) {
+    console.error(`Erro ao abrir a aba ${aba}:`, error);
+    conteudo.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;"><strong>Não foi possível carregar esta área.</strong><p class="muted">${escapeHtml(error?.message || "Erro desconhecido")}</p></div>`;
   }
-
-  // O HTML antigo já possui uma barra de abas. Nesse caso, acrescenta
-  // APENAS a aba de Avisos e Novidades, sem duplicar nem alterar as outras.
-  if (tabs && !tabs.querySelector("[data-admin-aba='avisos']")) {
-    const botaoAvisos = document.createElement("button");
-    botaoAvisos.type = "button";
-    botaoAvisos.className = "primary small";
-    botaoAvisos.setAttribute("data-admin-aba", "avisos");
-    botaoAvisos.textContent = "📢 Avisos e Novidades";
-    botaoAvisos.addEventListener("click", () => window.abrirAdminAba("avisos"));
-    tabs.appendChild(botaoAvisos);
-  }
-
-  if (!atual) {
-    atual = document.createElement("div");
-    atual.id = "adminConteudo";
-    container.appendChild(atual);
-  }
-  const carregadores = { horarios:renderAdminHorarios, precos:renderAdminPrecos, fotos:renderAdminFotos, promocoes:renderAdminPromocoes, vip:renderAdminVip, clientes:renderAdminClientes, agendamentos:renderAdminAgendamentos, financeiro:renderAdminFinanceiro, avisos:renderAdminAvisos, diagnostico:renderAdminDiagnostico };
-  await (carregadores[aba] || renderAdminHorarios)();
 };
 
 window.sairAdmin = async function () {
