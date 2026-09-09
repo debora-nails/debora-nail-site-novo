@@ -776,22 +776,37 @@ function adminClient() {
 
 async function verificarAdmin() {
   const client = adminClient();
+
   const { data: sessionData } = await client.auth.getSession();
   const user = sessionData?.session?.user;
-  if (!user) return { ok: false, message: "Entre primeiro na sua conta VIP." };
 
-  const { data, error } = await client
-    .from("Clientes")
-    .select("id, nome, whatsapp, email, is_admin")
-    .eq("user_id", user.id)
-    .maybeSingle();
+  if (!user) {
+    return {
+      ok: false,
+      message: "Entre primeiro na sua conta VIP."
+    };
+  }
+
+  const { data, error } = await client.rpc("usuario_atual_e_admin");
 
   if (error) {
-    console.error(error);
-    return { ok: false, message: "Não foi possível verificar seu acesso." };
+    console.error("Erro ao verificar administrador:", error);
+    return {
+      ok: false,
+      message: "Não foi possível verificar seu acesso."
+    };
   }
-  if (!data?.is_admin) return { ok: false, message: "Esta área é exclusiva da Débora." };
-  return { ok: true, cliente: data };
+
+  if (!data) {
+    return {
+      ok: false,
+      message: "Esta área é exclusiva da Débora."
+    };
+  }
+
+  return {
+    ok: true
+  };
 }
 
 window.abrirAreaDebora = async function () {
@@ -1264,7 +1279,7 @@ window.adminMarcarAgendamento = async function(id, status) {
   const nomes = {realizado:"concluir este atendimento como realizado", faltou:"marcar este atendimento como falta", cancelado:"cancelar este agendamento"};
   if (!confirm(`Deseja ${nomes[status] || "alterar o status"}?`)) return;
   const client = adminClient();
-  const { error } = await client.rpc("admin_marcar_agendamento", { p_agendamento_id: Number(id), p_status: status });
+  const { error } = await client.from("agendamentos").update({ status }).eq("id", id);
   if (error) { console.error(error); return alert("Não foi possível atualizar o agendamento."); }
   if (status === "realizado") {
     const { data: a } = await client.from("agendamentos").select("id,cliente_id,servico,data,forma_pagamento,pagamento_status").eq("id", id).single();
