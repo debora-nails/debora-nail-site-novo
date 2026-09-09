@@ -358,7 +358,6 @@ async function openBooking(index = null) {
         <option value="dinheiro">Dinheiro</option>
         <option value="debito">Cartão de débito</option>
         <option value="credito">Cartão de crédito</option>
-        <option value="pagar_depois" id="bookingPayLaterOption" style="display:none">Pagar depois</option>
       </select>
     </label>
 
@@ -386,14 +385,26 @@ async function openBooking(index = null) {
 }
 
 async function atualizarOpcaoPagarDepoisAgendamento() {
-  const option = document.getElementById("bookingPayLaterOption");
-  if (!option) return;
+  const select = document.getElementById("bookingPayment");
+  if (!select) return;
+
   const { cliente } = await getCurrentClient();
   const permitido = !!cliente?.permite_pagamento_posterior;
-  option.style.display = permitido ? "block" : "none";
-  option.disabled = !permitido;
-  if (!permitido && document.getElementById("bookingPayment")?.value === "pagar_depois") {
-    document.getElementById("bookingPayment").value = "";
+  const optionAtual = document.getElementById("bookingPayLaterOption");
+
+  // Só cria a opção quando a Débora liberou para esta cliente.
+  // Não usamos display:none em <option>, porque alguns navegadores continuam exibindo-a.
+  if (permitido) {
+    if (!optionAtual) {
+      const option = document.createElement("option");
+      option.value = "pagar_depois";
+      option.id = "bookingPayLaterOption";
+      option.textContent = "Pagar depois";
+      select.appendChild(option);
+    }
+  } else {
+    if (optionAtual) optionAtual.remove();
+    if (select.value === "pagar_depois") select.value = "";
   }
 }
 
