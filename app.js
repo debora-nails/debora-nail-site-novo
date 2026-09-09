@@ -836,6 +836,7 @@ function adminBotoes() {
       <button class="primary small" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
       <button class="primary small" data-admin-aba="financeiro" onclick="abrirAdminAba('financeiro')">💰 Financeiro</button>
       <button class="primary small" data-admin-aba="avisos" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
+      <button class="primary small" data-admin-aba="diagnostico" onclick="abrirAdminAba('diagnostico')">🔎 Diagnóstico</button>
     </div>
   `;
 }
@@ -1232,6 +1233,73 @@ async function renderAdminAvisos() {
   `).join("") || "<p>Nenhum aviso cadastrado ainda.</p>";
 }
 
+async function renderAdminDiagnostico() {
+  const conteudo = document.getElementById("adminConteudo");
+  if (!conteudo) return;
+  conteudo.innerHTML = `
+    <h3>🔎 Diagnóstico do site</h3>
+    <p class="muted">O próprio site vai verificar onde Clientes e Agendamentos estão travando. Não altera clientes, agendamentos ou financeiro.</p>
+    <div id="diagnosticoAdmin" style="display:grid;gap:10px;margin-top:14px;"></div>
+  `;
+  const box = document.getElementById("diagnosticoAdmin");
+  const inicio = Date.now();
+  const resultados = [];
+  const mostrar = () => {
+    box.innerHTML = resultados.map(r => `<div style="padding:13px 15px;border:1px solid #ead7df;border-radius:14px;background:#fff;">
+      <strong>${r.ok ? "✅" : "❌"} ${escapeHtml(r.titulo)}</strong>
+      <div style="margin-top:5px;white-space:pre-wrap;">${escapeHtml(r.msg)}</div>
+    </div>`).join("") + `<p class="muted">Diagnóstico concluído em ${Date.now()-inicio} ms.</p>`;
+  };
+  const add = (ok,titulo,msg) => { resultados.push({ok,titulo,msg}); mostrar(); };
+  try {
+    const client = adminClient();
+    const { data: sessionData, error: sessionError } = await client.auth.getSession();
+    const user = sessionData?.session?.user;
+    if (sessionError) add(false,"Sessão",sessionError.message || "Erro ao verificar sessão.");
+    else if (!user) add(false,"Sessão","Nenhuma sessão autenticada encontrada.");
+    else add(true,"Sessão","Usuária autenticada: " + (user.email || user.id));
+
+    const admin = await client.rpc("usuario_atual_e_admin");
+    if (admin.error) add(false,"Acesso de administradora",admin.error.message || "Erro na função usuario_atual_e_admin.");
+    else add(admin.data === true,"Acesso de administradora",admin.data === true ? "Administradora reconhecida." : "Usuária autenticada, mas não reconhecida como administradora.");
+
+    const testarRPC = async (nome, limite=7000) => {
+      const t0 = Date.now();
+      let timer;
+      try {
+        const promessa = client.rpc(nome);
+        const timeout = new Promise((_, reject) => { timer=setTimeout(() => reject(new Error("TIMEOUT: a função não respondeu em 7 segundos")), limite); });
+        const r = await Promise.race([promessa, timeout]);
+        clearTimeout(timer);
+        return { ...r, ms: Date.now()-t0 };
+      } catch(e) { clearTimeout(timer); return { data:null, error:e, ms:Date.now()-t0 }; }
+    };
+
+    const clientes = await testarRPC("admin_listar_clientes");
+    if (clientes.error) add(false,"RPC Clientes",`${clientes.error.message || clientes.error}
+Tempo: ${clientes.ms} ms`);
+    else add(true,"RPC Clientes",`Resposta recebida em ${clientes.ms} ms. Tipo: ${Array.isArray(clientes.data) ? "lista" : typeof clientes.data}. Registros: ${Array.isArray(clientes.data) ? clientes.data.length : "formato não-lista"}.`);
+
+    const ag = await testarRPC("admin_listar_agendamentos");
+    if (ag.error) add(false,"RPC Agendamentos",`${ag.error.message || ag.error}
+Tempo: ${ag.ms} ms`);
+    else {
+      const tipo = Array.isArray(ag.data) ? "lista" : typeof ag.data;
+      const qtd = Array.isArray(ag.data) ? ag.data.length : (Array.isArray(ag.data?.agendamentos) ? ag.data.agendamentos.length : "formato desconhecido");
+      add(true,"RPC Agendamentos",`Resposta recebida em ${ag.ms} ms. Tipo: ${tipo}. Registros: ${qtd}.`);
+    }
+
+    const versao = await client.rpc("admin_listar_agendamentos");
+    if (!versao.error) {
+      const formatoNovo = Array.isArray(versao.data);
+      const formatoAntigo = versao.data && Array.isArray(versao.data.agendamentos);
+      add(formatoNovo || formatoAntigo,"Formato dos Agendamentos",formatoNovo ? "Formato atual: lista de agendamentos." : formatoAntigo ? "Formato antigo: objeto com agendamentos." : "Formato inesperado retornado pelo banco.");
+    }
+  } catch (e) {
+    add(false,"Erro geral do diagnóstico",e?.message || String(e));
+  }
+}
+
 async function renderAdminAgendamentos() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
@@ -1239,30 +1307,9 @@ async function renderAdminAgendamentos() {
   const lista = document.getElementById("listaAgendamentosAdmin");
   try {
     const client = adminClient();
-    let payload;
-
-    // Primeiro tenta a RPC administrativa. Se a chamada ficar presa ou falhar,
-    // usa a leitura direta já autorizada para a administradora. Assim a tela
-    // nunca fica eternamente em “Carregando...”.
-    try {
-      const rpcPromise = client.rpc("admin_listar_agendamentos");
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("Tempo limite ao carregar os agendamentos.")), 8000)
-      );
-      const { data, error } = await Promise.race([rpcPromise, timeoutPromise]);
-      if (error) throw error;
-      payload = data && !Array.isArray(data) ? data : { agendamentos: data || [], clientes: [] };
-    } catch (rpcError) {
-      console.warn("RPC de agendamentos não respondeu; usando leitura administrativa direta.", rpcError);
-      const [agRes, cliRes] = await Promise.all([
-        client.from("agendamentos").select("*").order("data", { ascending: false }).order("horario", { ascending: false }),
-        client.from("Clientes").select("id,nome,whatsapp,email").order("nome")
-      ]);
-      if (agRes.error) throw agRes.error;
-      if (cliRes.error) throw cliRes.error;
-      payload = { agendamentos: agRes.data || [], clientes: cliRes.data || [] };
-    }
-
+    const { data, error } = await client.rpc("admin_listar_agendamentos");
+    if (error) throw error;
+    const payload = data && !Array.isArray(data) ? data : { agendamentos: data || [], clientes: [] };
     const agendamentos = Array.isArray(payload.agendamentos) ? payload.agendamentos : [];
     const clientes = Array.isArray(payload.clientes) ? payload.clientes : [];
     const cm = new Map(clientes.map(c => [String(c.id), c]));
@@ -1457,20 +1504,8 @@ window.abrirAdminAba = async function (aba) {
   if (area) area.style.display = "block";
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
-  const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", clientes:"👥 Clientes", agendamentos:"📋 Agendamentos", financeiro:"💰 Financeiro", avisos:"📢 Avisos e Novidades" };
+  const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", clientes:"👥 Clientes", agendamentos:"📋 Agendamentos", financeiro:"💰 Financeiro", avisos:"📢 Avisos e Novidades", diagnostico:"🔎 Diagnóstico" };
   const container = area.querySelector(".admin-container") || area;
-
-  // Existe uma barra antiga dentro da Área da Débora com nomes como
-  // “Horários Disponibilidade”. Ela é legado do painel antigo e não deve
-  // aparecer junto da barra atual. Remove somente essa barra, sem tocar
-  // no restante do site.
-  container.querySelectorAll(".admin-tabs").forEach(barra => {
-    const texto = (barra.textContent || "").replace(/\s+/g, " ").trim();
-    if (texto.includes("Horários Disponibilidade") || texto.includes("Preços Procedimentos")) {
-      barra.remove();
-    }
-  });
-
   const atual = document.getElementById("adminConteudo");
   let tabs = container.querySelector(".admin-tabs");
   if (!tabs) {
@@ -1499,7 +1534,7 @@ window.abrirAdminAba = async function (aba) {
     atual.id = "adminConteudo";
     container.appendChild(atual);
   }
-  const carregadores = { horarios:renderAdminHorarios, precos:renderAdminPrecos, fotos:renderAdminFotos, promocoes:renderAdminPromocoes, vip:renderAdminVip, clientes:renderAdminClientes, agendamentos:renderAdminAgendamentos, financeiro:renderAdminFinanceiro, avisos:renderAdminAvisos };
+  const carregadores = { horarios:renderAdminHorarios, precos:renderAdminPrecos, fotos:renderAdminFotos, promocoes:renderAdminPromocoes, vip:renderAdminVip, clientes:renderAdminClientes, agendamentos:renderAdminAgendamentos, financeiro:renderAdminFinanceiro, avisos:renderAdminAvisos, diagnostico:renderAdminDiagnostico };
   await (carregadores[aba] || renderAdminHorarios)();
 };
 
