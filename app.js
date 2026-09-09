@@ -921,6 +921,7 @@ window.adminAlterarHorario = async function (id, disponivel) {
 async function renderAdminHorarios() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
+
   conteudo.innerHTML = `<h3>📅 Horários</h3>
     <p>Cadastre os horários que ficarão disponíveis para suas clientes.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
@@ -929,14 +930,48 @@ async function renderAdminHorarios() {
       <button class="primary small" onclick="adminAdicionarHorario()">Adicionar</button>
     </div>
     <div id="listaHorariosAdmin" style="margin-top:18px">Carregando...</div>`;
+
   const client = adminClient();
-  const { data, error } = await client.from("horarios").select("id,data,horario,disponivel").order("data").order("horario");
-  if (error) { document.getElementById("listaHorariosAdmin").textContent = "Não foi possível carregar os horários."; return; }
-  document.getElementById("listaHorariosAdmin").innerHTML = (data || []).map(r => `
-    <div style="display:flex;justify-content:space-between;gap:10px;padding:10px;border-bottom:1px solid #eee;">
-      <span>${r.data} — ${String(r.horario).slice(0,5)} — ${r.disponivel ? "Disponível" : "Indisponível"}</span>
-      <button class="primary small" onclick="adminAlterarHorario(${r.id}, ${r.disponivel})">${r.disponivel ? "Bloquear" : "Liberar"}</button>
-    </div>`).join("") || "Nenhum horário cadastrado ainda.";
+
+  const { data: horarios, error: horariosError } = await client
+    .from("horarios")
+    .select("id,data,horario,disponivel")
+    .order("data")
+    .order("horario");
+
+  if (horariosError) {
+    console.error(horariosError);
+    document.getElementById("listaHorariosAdmin").textContent = "Não foi possível carregar os horários.";
+    return;
+  }
+
+  const { data: agendados, error: agendadosError } = await client
+    .from("agendamentos")
+    .select("data,horario,status")
+    .in("status", ["confirmado", "agendado", "pendente"]);
+
+  if (agendadosError) console.error(agendadosError);
+
+  const ocupados = new Set(
+    (agendados || []).map(a => `${a.data}|${String(a.horario).slice(0,5)}`)
+  );
+
+  document.getElementById("listaHorariosAdmin").innerHTML = (horarios || []).map(r => {
+    const chave = `${r.data}|${String(r.horario).slice(0,5)}`;
+    const ocupado = ocupados.has(chave);
+    const situacao = ocupado
+      ? "🔴 Ocupado — cliente agendada"
+      : (r.disponivel ? "🟢 Disponível" : "⚪ Indisponível");
+
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border-bottom:1px solid #eee;flex-wrap:wrap;">
+        <span>${r.data} — ${String(r.horario).slice(0,5)} — ${situacao}</span>
+        <button type="button" class="primary small"
+          onclick="adminAlterarHorario(${r.id}, ${r.disponivel})">
+          ${r.disponivel ? "Bloquear" : "Liberar"}
+        </button>
+      </div>`;
+  }).join("") || "Nenhum horário cadastrado ainda.";
 }
 
 window.adminAdicionarFoto = async function () {
