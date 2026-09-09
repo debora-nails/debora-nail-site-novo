@@ -1085,7 +1085,11 @@ async function renderAdminClientes() {
   const lista = document.getElementById("listaClientesAdmin");
   try {
     const client = adminClient();
-    const { data, error } = await client.rpc("admin_listar_clientes");
+    let timer;
+    const rpc = client.rpc("admin_listar_clientes");
+    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Tempo esgotado ao carregar clientes. Verifique a conexão com o Supabase.")), 10000); });
+    const { data, error } = await Promise.race([rpc, timeout]);
+    clearTimeout(timer);
     if (error) throw error;
     const clientes = Array.isArray(data) ? data : [];
     if (!clientes.length) {
@@ -1311,7 +1315,11 @@ async function renderAdminAgendamentos() {
   const lista = document.getElementById("listaAgendamentosAdmin");
   try {
     const client = adminClient();
-    const { data, error } = await client.rpc("admin_listar_agendamentos");
+    let timer;
+    const rpc = client.rpc("admin_listar_agendamentos");
+    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Tempo esgotado ao carregar agendamentos. Verifique a conexão com o Supabase.")), 10000); });
+    const { data, error } = await Promise.race([rpc, timeout]);
+    clearTimeout(timer);
     if (error) throw error;
     const agendamentos = Array.isArray(data) ? data : (Array.isArray(data?.agendamentos) ? data.agendamentos : []);
     const pagamentos = { pix:"Pix", dinheiro:"Dinheiro", debito:"Cartão de débito", credito:"Cartão de crédito", pagar_depois:"Pagar depois" };
@@ -1512,9 +1520,9 @@ window.abrirAdminAba = async function (aba) {
   if (!conteudo) return;
   const container = area.querySelector(".admin-container") || area;
 
-  // Há uma barra antiga gravada no HTML. Removemos TODAS as barras antigas
-  // da Área da Débora e reconstruímos apenas a barra oficial do app.js.
-  container.querySelectorAll(".admin-tabs").forEach(el => el.remove());
+  // CORREÇÃO DEFINITIVA: a barra antiga pode estar fora de .admin-container.
+  // Limpa qualquer barra de abas existente DENTRO da Área da Débora e cria uma única barra oficial.
+  area.querySelectorAll(".admin-tabs").forEach(el => el.remove());
   container.insertAdjacentHTML("afterbegin", adminBotoes());
   const tabs = container.querySelector(".admin-tabs");
   tabs?.querySelectorAll("[data-admin-aba]").forEach(botao => {
