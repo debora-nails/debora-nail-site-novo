@@ -125,6 +125,15 @@ let SERVICES = [
   ]
 ];
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;")
+    .replace(/\'/g, "&#039;");
+}
+
 const grid = document.getElementById("servicesGrid");
 const galleryGrid = document.getElementById("galleryGrid");
 let PROMOCOES_ATIVAS = [];
@@ -781,36 +790,33 @@ function adminClient() {
 async function verificarAdmin() {
   const client = adminClient();
 
-  const { data: sessionData } = await client.auth.getSession();
-  const user = sessionData?.session?.user;
+  try {
+    const sessionPromise = client.auth.getSession();
+    const sessionTimeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Tempo esgotado ao verificar a sessão.")), 8000)
+    );
+    const { data: sessionData } = await Promise.race([sessionPromise, sessionTimeout]);
+    const user = sessionData?.session?.user;
 
-  if (!user) {
-    return {
-      ok: false,
-      message: "Entre primeiro na sua conta VIP."
-    };
+    if (!user) {
+      return { ok:false, message:"Entre primeiro na sua conta VIP." };
+    }
+
+    const { data, error } = await client.rpc("usuario_atual_e_admin");
+    if (error) {
+      console.error("Erro ao verificar administrador:", error);
+      return { ok:false, message:"Não foi possível verificar seu acesso." };
+    }
+
+    if (!data) {
+      return { ok:false, message:"Esta área é exclusiva da Débora." };
+    }
+
+    return { ok:true };
+  } catch (error) {
+    console.error("Erro ao verificar sessão/admin:", error);
+    return { ok:false, message:error?.message || "Não foi possível verificar seu acesso." };
   }
-
-  const { data, error } = await client.rpc("usuario_atual_e_admin");
-
-  if (error) {
-    console.error("Erro ao verificar administrador:", error);
-    return {
-      ok: false,
-      message: "Não foi possível verificar seu acesso."
-    };
-  }
-
-  if (!data) {
-    return {
-      ok: false,
-      message: "Esta área é exclusiva da Débora."
-    };
-  }
-
-  return {
-    ok: true
-  };
 }
 
 window.abrirAreaDebora = async function () {
@@ -831,13 +837,13 @@ window.abrirAreaDebora = async function () {
 function adminBotoes() {
   return `
     <div class="admin-tabs" style="display:flex;flex-wrap:wrap;gap:8px;margin:18px 0;">
-      <button class="primary small" onclick="abrirAdminAba('horarios')">📅 Horários</button>
-      <button class="primary small" onclick="abrirAdminAba('precos')">💰 Preços</button>
-      <button class="primary small" onclick="abrirAdminAba('fotos')">📸 Fotos</button>
-      <button class="primary small" onclick="abrirAdminAba('promocoes')">🎀 Promoções</button>
-      <button class="primary small" onclick="abrirAdminAba('vip')">⭐ VIP Fidelidade</button>
-      <button class="primary small" onclick="abrirAdminAba('clientes')">👥 Clientes</button>
-      <button class="primary small" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
+      <button class="primary small" data-admin-aba="horarios" onclick="abrirAdminAba('horarios')">📅 Horários</button>
+      <button class="primary small" data-admin-aba="precos" onclick="abrirAdminAba('precos')">💰 Preços</button>
+      <button class="primary small" data-admin-aba="fotos" onclick="abrirAdminAba('fotos')">📸 Fotos</button>
+      <button class="primary small" data-admin-aba="promocoes" onclick="abrirAdminAba('promocoes')">🎀 Promoções</button>
+      <button class="primary small" data-admin-aba="vip" onclick="abrirAdminAba('vip')">⭐ VIP Fidelidade</button>
+      <button class="primary small" data-admin-aba="clientes" onclick="abrirAdminAba('clientes')">👥 Clientes</button>
+      <button class="primary small" data-admin-aba="agendamentos" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
       <button class="primary small" data-admin-aba="financeiro" onclick="abrirAdminAba('financeiro')">💰 Financeiro</button>
       <button class="primary small" data-admin-aba="avisos" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
       <button class="primary small" data-admin-aba="diagnostico" onclick="abrirAdminAba('diagnostico')">🔎 Diagnóstico</button>
