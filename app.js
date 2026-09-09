@@ -1062,40 +1062,35 @@ async function renderAdminClientes() {
     <p class="muted">Aqui aparecem as clientes que se cadastrarem no site. O pagamento depois fica desligado por padrão.</p>
     <div id="listaClientesAdmin">Carregando...</div>
   `;
-
-  const client = adminClient();
-  const { data, error } = await client
-    .from("Clientes")
-    .select("id,nome,whatsapp,email,is_admin,permite_pagamento_posterior")
-    .order("nome", { ascending: true });
-
   const lista = document.getElementById("listaClientesAdmin");
-  if (error) {
-    console.error("Erro ao carregar clientes:", error);
-    if (lista) lista.innerHTML = `<p>Não foi possível carregar as clientes.</p><small>${escapeHtml(error.message || "Erro desconhecido")}</small>`;
-    return;
-  }
-
-  if (!data?.length) {
-    lista.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;">Ainda não há clientes cadastradas. 💗</div>`;
-    return;
-  }
-
-  lista.innerHTML = data.map(c => `
-    <div style="padding:16px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
-      <strong>👤 ${escapeHtml(c.nome || "Cliente")}</strong>
-      <div style="margin-top:5px;">📱 ${escapeHtml(c.whatsapp || "Não informado")}</div>
-      <div>✉️ ${escapeHtml(c.email || "Não informado")}</div>
-      <div style="margin-top:10px;">
-        <label style="display:inline-flex;align-items:center;gap:8px;">
-          <input type="checkbox" ${c.permite_pagamento_posterior ? "checked" : ""}
-            onchange="adminAlternarPagamentoPosterior(${Number(c.id)}, this.checked)">
-          <strong>Permitir “Pagar depois”</strong>
-        </label>
+  try {
+    const client = adminClient();
+    const { data, error } = await client.rpc("admin_listar_clientes");
+    if (error) throw error;
+    const clientes = Array.isArray(data) ? data : [];
+    if (!clientes.length) {
+      lista.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;">Ainda não há clientes cadastradas. 💗</div>`;
+      return;
+    }
+    lista.innerHTML = clientes.map(c => `
+      <div style="padding:16px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
+        <strong>👤 ${escapeHtml(c.nome || "Cliente")}</strong>
+        <div style="margin-top:5px;">📱 ${escapeHtml(c.whatsapp || "Não informado")}</div>
+        <div>✉️ ${escapeHtml(c.email || "Não informado")}</div>
+        <div style="margin-top:10px;">
+          <label style="display:inline-flex;align-items:center;gap:8px;">
+            <input type="checkbox" ${c.permite_pagamento_posterior ? "checked" : ""}
+              onchange="adminAlternarPagamentoPosterior(${Number(c.id)}, this.checked)">
+            <strong>Permitir “Pagar depois”</strong>
+          </label>
+        </div>
+        <small style="display:block;margin-top:6px;color:#777;">${c.permite_pagamento_posterior ? "Cliente autorizada a pagar depois." : "Pagamento depois desativado."}</small>
       </div>
-      <small style="display:block;margin-top:6px;color:#777;">${c.permite_pagamento_posterior ? "Cliente autorizada a pagar depois." : "Pagamento depois desativado."}</small>
-    </div>
-  `).join("");
+    `).join("");
+  } catch (error) {
+    console.error("Erro ao carregar clientes:", error);
+    if (lista) lista.innerHTML = `<p>Não foi possível carregar as clientes.</p><small>${escapeHtml(error?.message || "Erro desconhecido")}</small>`;
+  }
 }
 
 window.adminSalvarPontos = async function (clienteId, vipId) {
@@ -1116,9 +1111,9 @@ window.adminSalvarPontos = async function (clienteId, vipId) {
 
 window.adminAlternarPagamentoPosterior = async function (clienteId, permitido) {
   const client = adminClient();
-  const { error } = await client.from("Clientes").update({ permite_pagamento_posterior: !!permitido }).eq("id", clienteId);
+  const { error } = await client.rpc("admin_definir_pagamento_posterior", { p_cliente_id: Number(clienteId), p_permitido: !!permitido });
   if (error) { console.error(error); alert("Não foi possível atualizar essa permissão."); return; }
-  renderAdminVip();
+  renderAdminClientes();
 };
 
 async function renderAdminVip() {
@@ -1225,67 +1220,27 @@ async function renderAdminAvisos() {
 async function renderAdminAgendamentos() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
-
   conteudo.innerHTML = `<h3>📋 Agendamentos</h3><p class="muted">Acompanhe os horários e registre o resultado de cada atendimento.</p><div id="listaAgendamentosAdmin">Carregando...</div>`;
   const lista = document.getElementById("listaAgendamentosAdmin");
-
   try {
     const client = adminClient();
-    // Usa todas as colunas para não quebrar caso alguma coluna opcional ainda não exista.
-    const resultado = await client
-      .from("agendamentos")
-      .select("*")
-      .order("data", { ascending: false })
-      .order("horario", { ascending: false });
-
-    if (resultado.error) {
-      console.error("Erro ao carregar agendamentos:", resultado.error);
-      if (lista) lista.innerHTML = `<p>Não foi possível carregar os agendamentos.</p><small>${escapeHtml(resultado.error.message || "Erro desconhecido")}</small>`;
-      return;
-    }
-
-    const data = resultado.data || [];
-    const ids = [...new Set(data.map(a => a.cliente_id).filter(Boolean))];
-    let clientes = [];
-
-    if (ids.length) {
-      const r = await client.from("Clientes").select("id,nome,whatsapp").in("id", ids);
-      if (r.error) {
-        console.error("Erro ao carregar clientes dos agendamentos:", r.error);
-      } else {
-        clientes = r.data || [];
-      }
-    }
-
-    const cm = new Map(clientes.map(c => [c.id, c]));
-    const pagamentos = {
-      pix: "Pix",
-      dinheiro: "Dinheiro",
-      debito: "Cartão de débito",
-      credito: "Cartão de crédito",
-      pagar_depois: "Pagar depois"
-    };
-    const statusLabel = s => ({
-      confirmado: "Confirmado",
-      agendado: "Agendado",
-      realizado: "Realizado",
-      cancelado: "Cancelado",
-      faltou: "Faltou"
-    }[String(s || "").toLowerCase()] || s || "Agendado");
-
-    if (!data.length) {
+    const { data, error } = await client.rpc("admin_listar_agendamentos");
+    if (error) throw error;
+    const payload = data && !Array.isArray(data) ? data : { agendamentos: data || [], clientes: [] };
+    const agendamentos = Array.isArray(payload.agendamentos) ? payload.agendamentos : [];
+    const clientes = Array.isArray(payload.clientes) ? payload.clientes : [];
+    const cm = new Map(clientes.map(c => [String(c.id), c]));
+    const pagamentos = { pix:"Pix", dinheiro:"Dinheiro", debito:"Cartão de débito", credito:"Cartão de crédito", pagar_depois:"Pagar depois" };
+    const statusLabel = s => ({ confirmado:"Confirmado", agendado:"Agendado", realizado:"Realizado", cancelado:"Cancelado", faltou:"Faltou" }[String(s || "").toLowerCase()] || s || "Agendado");
+    if (!agendamentos.length) {
       lista.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;">Nenhum agendamento cadastrado ainda. 💗</div>`;
       return;
     }
-
-    lista.innerHTML = data.map(a => {
-      const c = cm.get(a.cliente_id);
+    lista.innerHTML = agendamentos.map(a => {
+      const c = cm.get(String(a.cliente_id));
       const pagamento = pagamentos[a.forma_pagamento] || "Não informado";
-      const trocoInfo = a.forma_pagamento === "dinheiro" && a.troco_para != null
-        ? `<br>Troco para: ${money(Number(a.troco_para))}${a.troco != null ? ` — Troco: ${money(Number(a.troco))}` : ""}`
-        : "";
-      const podeFechar = !["cancelado", "faltou", "realizado"].includes(String(a.status || "").toLowerCase());
-
+      const trocoInfo = a.forma_pagamento === "dinheiro" && a.troco_para != null ? `<br>Troco para: ${money(Number(a.troco_para))}${a.troco != null ? ` — Troco: ${money(Number(a.troco))}` : ""}` : "";
+      const podeFechar = !["cancelado","faltou","realizado"].includes(String(a.status || "").toLowerCase());
       return `<div style="padding:14px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
         <strong>📅 ${escapeHtml(String(a.data || ""))} — ${escapeHtml(String(a.horario || "").slice(0,5))}</strong>
         <div style="margin-top:6px;">💅 ${escapeHtml(a.servico || "Serviço não informado")}</div>
@@ -1299,11 +1254,12 @@ async function renderAdminAgendamentos() {
         </div>` : ""}
       </div>`;
     }).join("");
-  } catch (e) {
-    console.error("Falha inesperada ao abrir Agendamentos:", e);
-    if (lista) lista.innerHTML = `<p>Não foi possível carregar os agendamentos.</p><small>Verifique o console se o problema continuar.</small>`;
+  } catch (error) {
+    console.error("Erro REAL ao carregar agendamentos:", error);
+    if (lista) lista.innerHTML = `<p>Não foi possível carregar os agendamentos.</p><small>${escapeHtml(error?.message || "Erro desconhecido")}</small>`;
   }
 }
+
 window.adminMarcarAgendamento = async function(id, status) {
   const nomes = {realizado:"concluir este atendimento como realizado", faltou:"marcar este atendimento como falta", cancelado:"cancelar este agendamento"};
   if (!confirm(`Deseja ${nomes[status] || "alterar o status"}?`)) return;
