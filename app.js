@@ -826,33 +826,18 @@ window.abrirAreaDebora = async function () {
 
 function adminBotoes() {
   return `
-    <div class="admin-tabs" data-admin-menu="principal" aria-label="Menu da Área da Débora">
-      <button type="button" class="primary small" data-admin-aba="horarios" onclick="abrirAdminAba('horarios')">📅 Horários</button>
-      <button type="button" class="primary small" data-admin-aba="precos" onclick="abrirAdminAba('precos')">💰 Preços</button>
-      <button type="button" class="primary small" data-admin-aba="fotos" onclick="abrirAdminAba('fotos')">📸 Fotos</button>
-      <button type="button" class="primary small" data-admin-aba="promocoes" onclick="abrirAdminAba('promocoes')">🎀 Promoções</button>
-      <button type="button" class="primary small" data-admin-aba="vip" onclick="abrirAdminAba('vip')">⭐ VIP Fidelidade</button>
-      <button type="button" class="primary small" data-admin-aba="clientes" onclick="abrirAdminAba('clientes')">👥 Clientes</button>
-      <button type="button" class="primary small" data-admin-aba="agendamentos" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
-      <button type="button" class="primary small" data-admin-aba="financeiro" onclick="abrirAdminAba('financeiro')">💰 Financeiro</button>
-      <button type="button" class="primary small" data-admin-aba="avisos" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
+    <div class="admin-tabs" style="display:flex;flex-wrap:wrap;gap:8px;margin:18px 0;">
+      <button class="primary small" onclick="abrirAdminAba('horarios')">📅 Horários</button>
+      <button class="primary small" onclick="abrirAdminAba('precos')">💰 Preços</button>
+      <button class="primary small" onclick="abrirAdminAba('fotos')">📸 Fotos</button>
+      <button class="primary small" onclick="abrirAdminAba('promocoes')">🎀 Promoções</button>
+      <button class="primary small" onclick="abrirAdminAba('vip')">⭐ VIP Fidelidade</button>
+      <button class="primary small" onclick="abrirAdminAba('clientes')">👥 Clientes</button>
+      <button class="primary small" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
+      <button class="primary small" data-admin-aba="financeiro" onclick="abrirAdminAba('financeiro')">💰 Financeiro</button>
+      <button class="primary small" data-admin-aba="avisos" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
     </div>
   `;
-}
-
-function aplicarVisualAreaDebora() {
-  if (document.getElementById('debora-admin-style')) return;
-  const style = document.createElement('style');
-  style.id = 'debora-admin-style';
-  style.textContent = `
-    #areaDebora { margin-top:24px; padding:22px; border:1px solid #ead7df; border-radius:24px; background:linear-gradient(180deg,#fffafd 0%,#fff 100%); box-shadow:0 12px 35px rgba(80,30,50,.08); }
-    #areaDebora .admin-tabs[data-admin-menu="principal"] { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 20px; padding:10px; border-radius:18px; background:#fff; border:1px solid #ead7df; }
-    #areaDebora .admin-tabs[data-admin-menu="principal"] button { border-radius:12px; transition:.2s ease; }
-    #areaDebora .admin-tabs[data-admin-menu="principal"] button.active { box-shadow:0 0 0 2px rgba(145,60,90,.16); transform:translateY(-1px); }
-    #areaDebora #adminConteudo { padding:18px; border-radius:20px; background:rgba(255,255,255,.86); border:1px solid #f0e2e8; }
-    @media(max-width:700px){ #areaDebora{padding:14px;border-radius:18px;} #areaDebora .admin-tabs[data-admin-menu="principal"] button{flex:1 1 calc(50% - 8px);} }
-  `;
-  document.head.appendChild(style);
 }
 
 async function carregarServicosAdmin() {
@@ -1254,33 +1239,45 @@ async function renderAdminAgendamentos() {
   const lista = document.getElementById("listaAgendamentosAdmin");
   try {
     const client = adminClient();
+    let payload;
 
-    // Para a Área da Débora, fazemos a leitura diretamente das tabelas.
-    // A conta administrativa já está autenticada e este caminho evita que
-    // uma RPC antiga/indisponível deixe a tela presa em “Carregando...”.
-    const [{ data: agendamentos, error: erroAg }, { data: clientes, error: erroCli }] = await Promise.all([
-      client.from("agendamentos").select("*").order("data", { ascending: false }).order("horario", { ascending: false }),
-      client.from("Clientes").select("id,nome,whatsapp,email").order("nome")
-    ]);
-
-    if (erroAg) throw erroAg;
-    if (erroCli) throw erroCli;
-
-    const cm = new Map((clientes || []).map(c => [String(c.id), c]));
-    const pagamentos = { pix:"Pix", dinheiro:"Dinheiro", debito:"Cartão de débito", credito:"Cartão de crédito", pagar_depois:"Pagar depois" };
-    const statusLabel = s => ({ confirmado:"Confirmado", agendado:"Agendado", realizado:"Realizado", cancelado:"Cancelado", faltou:"Faltou" }[String(s || "").toLowerCase()] || s || "Agendado");
-
-    if (!(agendamentos || []).length) {
-      lista.innerHTML = `<div style="padding:20px;border:1px solid #ead7df;border-radius:16px;background:#fff;text-align:center;">Nenhum agendamento cadastrado ainda. 💗</div>`;
-      return;
+    // Primeiro tenta a RPC administrativa. Se a chamada ficar presa ou falhar,
+    // usa a leitura direta já autorizada para a administradora. Assim a tela
+    // nunca fica eternamente em “Carregando...”.
+    try {
+      const rpcPromise = client.rpc("admin_listar_agendamentos");
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Tempo limite ao carregar os agendamentos.")), 8000)
+      );
+      const { data, error } = await Promise.race([rpcPromise, timeoutPromise]);
+      if (error) throw error;
+      payload = data && !Array.isArray(data) ? data : { agendamentos: data || [], clientes: [] };
+    } catch (rpcError) {
+      console.warn("RPC de agendamentos não respondeu; usando leitura administrativa direta.", rpcError);
+      const [agRes, cliRes] = await Promise.all([
+        client.from("agendamentos").select("*").order("data", { ascending: false }).order("horario", { ascending: false }),
+        client.from("Clientes").select("id,nome,whatsapp,email").order("nome")
+      ]);
+      if (agRes.error) throw agRes.error;
+      if (cliRes.error) throw cliRes.error;
+      payload = { agendamentos: agRes.data || [], clientes: cliRes.data || [] };
     }
 
+    const agendamentos = Array.isArray(payload.agendamentos) ? payload.agendamentos : [];
+    const clientes = Array.isArray(payload.clientes) ? payload.clientes : [];
+    const cm = new Map(clientes.map(c => [String(c.id), c]));
+    const pagamentos = { pix:"Pix", dinheiro:"Dinheiro", debito:"Cartão de débito", credito:"Cartão de crédito", pagar_depois:"Pagar depois" };
+    const statusLabel = s => ({ confirmado:"Confirmado", agendado:"Agendado", realizado:"Realizado", cancelado:"Cancelado", faltou:"Faltou" }[String(s || "").toLowerCase()] || s || "Agendado");
+    if (!agendamentos.length) {
+      lista.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;">Nenhum agendamento cadastrado ainda. 💗</div>`;
+      return;
+    }
     lista.innerHTML = agendamentos.map(a => {
       const c = cm.get(String(a.cliente_id));
       const pagamento = pagamentos[a.forma_pagamento] || "Não informado";
       const trocoInfo = a.forma_pagamento === "dinheiro" && a.troco_para != null ? `<br>Troco para: ${money(Number(a.troco_para))}${a.troco != null ? ` — Troco: ${money(Number(a.troco))}` : ""}` : "";
       const podeFechar = !["cancelado","faltou","realizado"].includes(String(a.status || "").toLowerCase());
-      return `<div style="padding:16px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;box-shadow:0 4px 12px rgba(80,30,50,.04);">
+      return `<div style="padding:14px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
         <strong>📅 ${escapeHtml(String(a.data || ""))} — ${escapeHtml(String(a.horario || "").slice(0,5))}</strong>
         <div style="margin-top:6px;">💅 ${escapeHtml(a.servico || "Serviço não informado")}</div>
         <div>👤 ${escapeHtml(c?.nome || "Cliente")}${c?.whatsapp ? ` — ${escapeHtml(c.whatsapp)}` : ""}</div>
@@ -1295,7 +1292,7 @@ async function renderAdminAgendamentos() {
     }).join("");
   } catch (error) {
     console.error("Erro REAL ao carregar agendamentos:", error);
-    if (lista) lista.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;"><strong>Não foi possível carregar os agendamentos.</strong><br><small>${escapeHtml(error?.message || "Erro desconhecido")}</small></div>`;
+    if (lista) lista.innerHTML = `<p>Não foi possível carregar os agendamentos.</p><small>${escapeHtml(error?.message || "Erro desconhecido")}</small>`;
   }
 }
 
@@ -1456,51 +1453,54 @@ async function finMostrarRelatorios(){
 window.abrirAdminAba = async function (aba) {
   const resultado = await verificarAdmin();
   if (!resultado.ok) { alert(resultado.message); return; }
-
   const area = document.getElementById("areaDebora");
-  if (area) { area.style.display = "block"; aplicarVisualAreaDebora(); }
-
+  if (area) area.style.display = "block";
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
+  const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", clientes:"👥 Clientes", agendamentos:"📋 Agendamentos", financeiro:"💰 Financeiro", avisos:"📢 Avisos e Novidades" };
   const container = area.querySelector(".admin-container") || area;
 
-  // Mantém uma única barra de navegação: remove somente barras antigas
-  // que não pertençam ao novo menu data-admin-menu="principal".
+  // Existe uma barra antiga dentro da Área da Débora com nomes como
+  // “Horários Disponibilidade”. Ela é legado do painel antigo e não deve
+  // aparecer junto da barra atual. Remove somente essa barra, sem tocar
+  // no restante do site.
   container.querySelectorAll(".admin-tabs").forEach(barra => {
-    if (barra.getAttribute("data-admin-menu") !== "principal") barra.remove();
+    const texto = (barra.textContent || "").replace(/\s+/g, " ").trim();
+    if (texto.includes("Horários Disponibilidade") || texto.includes("Preços Procedimentos")) {
+      barra.remove();
+    }
   });
 
-  let tabs = container.querySelector('.admin-tabs[data-admin-menu="principal"]');
+  const atual = document.getElementById("adminConteudo");
+  let tabs = container.querySelector(".admin-tabs");
   if (!tabs) {
-    conteudo.insertAdjacentHTML("beforebegin", adminBotoes());
-    tabs = container.querySelector('.admin-tabs[data-admin-menu="principal"]');
+    if (atual && atual.parentElement === container) {
+      atual.insertAdjacentHTML("beforebegin", adminBotoes());
+    } else {
+      container.insertAdjacentHTML("beforeend", adminBotoes());
+    }
+    tabs = container.querySelector(".admin-tabs");
   }
 
-  if (tabs) {
-    tabs.querySelectorAll("[data-admin-aba]").forEach(botao => {
-      botao.classList.toggle("active", botao.getAttribute("data-admin-aba") === aba);
-    });
+  // O HTML antigo já possui uma barra de abas. Nesse caso, acrescenta
+  // APENAS a aba de Avisos e Novidades, sem duplicar nem alterar as outras.
+  if (tabs && !tabs.querySelector("[data-admin-aba='avisos']")) {
+    const botaoAvisos = document.createElement("button");
+    botaoAvisos.type = "button";
+    botaoAvisos.className = "primary small";
+    botaoAvisos.setAttribute("data-admin-aba", "avisos");
+    botaoAvisos.textContent = "📢 Avisos e Novidades";
+    botaoAvisos.addEventListener("click", () => window.abrirAdminAba("avisos"));
+    tabs.appendChild(botaoAvisos);
   }
 
-  const carregadores = {
-    horarios: renderAdminHorarios,
-    precos: renderAdminPrecos,
-    fotos: renderAdminFotos,
-    promocoes: renderAdminPromocoes,
-    vip: renderAdminVip,
-    clientes: renderAdminClientes,
-    agendamentos: renderAdminAgendamentos,
-    financeiro: renderAdminFinanceiro,
-    avisos: renderAdminAvisos
-  };
-
-  const carregar = carregadores[aba] || renderAdminHorarios;
-  try {
-    await carregar();
-  } catch (error) {
-    console.error(`Erro ao abrir a aba ${aba}:`, error);
-    conteudo.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;"><strong>Não foi possível carregar esta área.</strong><p class="muted">${escapeHtml(error?.message || "Erro desconhecido")}</p></div>`;
+  if (!atual) {
+    atual = document.createElement("div");
+    atual.id = "adminConteudo";
+    container.appendChild(atual);
   }
+  const carregadores = { horarios:renderAdminHorarios, precos:renderAdminPrecos, fotos:renderAdminFotos, promocoes:renderAdminPromocoes, vip:renderAdminVip, clientes:renderAdminClientes, agendamentos:renderAdminAgendamentos, financeiro:renderAdminFinanceiro, avisos:renderAdminAvisos };
+  await (carregadores[aba] || renderAdminHorarios)();
 };
 
 window.sairAdmin = async function () {
