@@ -1264,7 +1264,7 @@ window.adminMarcarAgendamento = async function(id, status) {
   const nomes = {realizado:"concluir este atendimento como realizado", faltou:"marcar este atendimento como falta", cancelado:"cancelar este agendamento"};
   if (!confirm(`Deseja ${nomes[status] || "alterar o status"}?`)) return;
   const client = adminClient();
-  const { error } = await client.from("agendamentos").update({ status }).eq("id", id);
+  const { error } = await client.rpc("admin_marcar_agendamento", { p_agendamento_id: Number(id), p_status: status });
   if (error) { console.error(error); return alert("Não foi possível atualizar o agendamento."); }
   if (status === "realizado") {
     const { data: a } = await client.from("agendamentos").select("id,cliente_id,servico,data,forma_pagamento,pagamento_status").eq("id", id).single();
