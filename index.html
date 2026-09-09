@@ -154,8 +154,6 @@
   </div>
 
 
-  <!-- CARTÃO FIDELIDADE -->
-
   <div class="loyalty-card">
 
     <span class="loyalty-heart">♡</span>
@@ -524,72 +522,59 @@
   </div>
 
 </div>
+
+
 <!-- ÁREA DA DÉBORA -->
 <section id="areaDebora" class="admin-area" style="display:none;">
+
   <div class="admin-container">
 
     <div class="admin-header">
+
       <div>
+
         <span class="admin-eyebrow">ÁREA EXCLUSIVA</span>
+
         <h2>Área da Débora 👑</h2>
+
         <p>Gerencie seu studio de forma simples e prática.</p>
+
       </div>
 
-      <button type="button" onclick="sairAdmin()" class="admin-sair">
+      <button
+        type="button"
+        onclick="sairAdmin()"
+        class="admin-sair"
+      >
         Sair
       </button>
-    </div>
-
-    <div class="admin-menu">
-
-      <button type="button" onclick="abrirAdminAba('horarios')">
-        📅
-        <strong>Horários</strong>
-        <span>Disponibilidade</span>
-      </button>
-
-      <button type="button" onclick="abrirAdminAba('precos')">
-        💰
-        <strong>Preços</strong>
-        <span>Procedimentos</span>
-      </button>
-
-      <button type="button" onclick="abrirAdminAba('fotos')">
-        📸
-        <strong>Fotos</strong>
-        <span>Galeria</span>
-      </button>
-
-      <button type="button" onclick="abrirAdminAba('promocoes')">
-        🎀
-        <strong>Promoções</strong>
-        <span>Ofertas</span>
-      </button>
-
-      <button type="button" onclick="abrirAdminAba('vip')">
-        ⭐
-        <strong>VIP Fidelidade</strong>
-        <span>Pontos</span>
-      </button>
-
-      <button type="button" onclick="abrirAdminAba('agendamentos')">
-        📋
-        <strong>Agendamentos</strong>
-        <span>Clientes</span>
-      </button>
 
     </div>
+
+
+    <!--
+      O menu administrativo é criado pelo app.js.
+      Não colocar outro menu aqui para evitar duplicação.
+    -->
 
     <div id="adminConteudo">
+
       <div class="admin-boas-vindas">
+
         <span>♡</span>
+
         <h3>Bem-vinda, Débora!</h3>
+
         <p>Escolha uma opção acima para começar.</p>
+
       </div>
+
     </div>
 
   </div>
+
 </section>
+
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
