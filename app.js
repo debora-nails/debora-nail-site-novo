@@ -125,15 +125,6 @@ let SERVICES = [
   ]
 ];
 
-function escapeHtml(value) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
-    .replace(/\'/g, "&#039;");
-}
-
 const grid = document.getElementById("servicesGrid");
 const galleryGrid = document.getElementById("galleryGrid");
 let PROMOCOES_ATIVAS = [];
@@ -358,6 +349,7 @@ async function openBooking(index = null) {
         <option value="dinheiro">Dinheiro</option>
         <option value="debito">Cartão de débito</option>
         <option value="credito">Cartão de crédito</option>
+        <option value="pagar_depois" id="bookingPayLaterOption" style="display:none">Pagar depois</option>
       </select>
     </label>
 
@@ -385,26 +377,14 @@ async function openBooking(index = null) {
 }
 
 async function atualizarOpcaoPagarDepoisAgendamento() {
-  const select = document.getElementById("bookingPayment");
-  if (!select) return;
-
+  const option = document.getElementById("bookingPayLaterOption");
+  if (!option) return;
   const { cliente } = await getCurrentClient();
   const permitido = !!cliente?.permite_pagamento_posterior;
-  const optionAtual = document.getElementById("bookingPayLaterOption");
-
-  // Só cria a opção quando a Débora liberou para esta cliente.
-  // Não usamos display:none em <option>, porque alguns navegadores continuam exibindo-a.
-  if (permitido) {
-    if (!optionAtual) {
-      const option = document.createElement("option");
-      option.value = "pagar_depois";
-      option.id = "bookingPayLaterOption";
-      option.textContent = "Pagar depois";
-      select.appendChild(option);
-    }
-  } else {
-    if (optionAtual) optionAtual.remove();
-    if (select.value === "pagar_depois") select.value = "";
+  option.style.display = permitido ? "block" : "none";
+  option.disabled = !permitido;
+  if (!permitido && document.getElementById("bookingPayment")?.value === "pagar_depois") {
+    document.getElementById("bookingPayment").value = "";
   }
 }
 
@@ -787,47 +767,31 @@ renderServices();
 renderGallery();
 // ===== ÁREA DA DÉBORA =====
 
-let __adminClientInstance = null;
 function adminClient() {
-  if (!__adminClientInstance) {
-    __adminClientInstance = window.supabase.createClient(
-      window.SUPABASE_CONFIG.url,
-      window.SUPABASE_CONFIG.publishableKey
-    );
-  }
-  return __adminClientInstance;
+  return window.supabase.createClient(
+    window.SUPABASE_CONFIG.url,
+    window.SUPABASE_CONFIG.publishableKey
+  );
 }
 
 async function verificarAdmin() {
   const client = adminClient();
+  const { data: sessionData } = await client.auth.getSession();
+  const user = sessionData?.session?.user;
+  if (!user) return { ok: false, message: "Entre primeiro na sua conta VIP." };
 
-  try {
-    const sessionPromise = client.auth.getSession();
-    const sessionTimeout = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Tempo esgotado ao verificar a sessão.")), 8000)
-    );
-    const { data: sessionData } = await Promise.race([sessionPromise, sessionTimeout]);
-    const user = sessionData?.session?.user;
+  const { data, error } = await client
+    .from("Clientes")
+    .select("id, nome, whatsapp, email, is_admin")
+    .eq("user_id", user.id)
+    .maybeSingle();
 
-    if (!user) {
-      return { ok:false, message:"Entre primeiro na sua conta VIP." };
-    }
-
-    const { data, error } = await client.rpc("usuario_atual_e_admin");
-    if (error) {
-      console.error("Erro ao verificar administrador:", error);
-      return { ok:false, message:"Não foi possível verificar seu acesso." };
-    }
-
-    if (!data) {
-      return { ok:false, message:"Esta área é exclusiva da Débora." };
-    }
-
-    return { ok:true };
-  } catch (error) {
-    console.error("Erro ao verificar sessão/admin:", error);
-    return { ok:false, message:error?.message || "Não foi possível verificar seu acesso." };
+  if (error) {
+    console.error(error);
+    return { ok: false, message: "Não foi possível verificar seu acesso." };
   }
+  if (!data?.is_admin) return { ok: false, message: "Esta área é exclusiva da Débora." };
+  return { ok: true, cliente: data };
 }
 
 window.abrirAreaDebora = async function () {
@@ -848,16 +812,15 @@ window.abrirAreaDebora = async function () {
 function adminBotoes() {
   return `
     <div class="admin-tabs" style="display:flex;flex-wrap:wrap;gap:8px;margin:18px 0;">
-      <button class="primary small" data-admin-aba="horarios" onclick="abrirAdminAba('horarios')">📅 Horários</button>
-      <button class="primary small" data-admin-aba="precos" onclick="abrirAdminAba('precos')">💰 Preços</button>
-      <button class="primary small" data-admin-aba="fotos" onclick="abrirAdminAba('fotos')">📸 Fotos</button>
-      <button class="primary small" data-admin-aba="promocoes" onclick="abrirAdminAba('promocoes')">🎀 Promoções</button>
-      <button class="primary small" data-admin-aba="vip" onclick="abrirAdminAba('vip')">⭐ VIP Fidelidade</button>
-      <button class="primary small" data-admin-aba="clientes" onclick="abrirAdminAba('clientes')">👥 Clientes</button>
-      <button class="primary small" data-admin-aba="agendamentos" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
+      <button class="primary small" onclick="abrirAdminAba('horarios')">📅 Horários</button>
+      <button class="primary small" onclick="abrirAdminAba('precos')">💰 Preços</button>
+      <button class="primary small" onclick="abrirAdminAba('fotos')">📸 Fotos</button>
+      <button class="primary small" onclick="abrirAdminAba('promocoes')">🎀 Promoções</button>
+      <button class="primary small" onclick="abrirAdminAba('vip')">⭐ VIP Fidelidade</button>
+      <button class="primary small" onclick="abrirAdminAba('clientes')">👥 Clientes</button>
+      <button class="primary small" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
       <button class="primary small" data-admin-aba="financeiro" onclick="abrirAdminAba('financeiro')">💰 Financeiro</button>
       <button class="primary small" data-admin-aba="avisos" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
-      <button class="primary small" data-admin-aba="diagnostico" onclick="abrirAdminAba('diagnostico')">🔎 Diagnóstico</button>
     </div>
   `;
 }
@@ -932,6 +895,7 @@ window.adminAlterarHorario = async function (id, disponivel) {
 async function renderAdminHorarios() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
+
   conteudo.innerHTML = `<h3>📅 Horários</h3>
     <p>Cadastre os horários que ficarão disponíveis para suas clientes.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
@@ -940,14 +904,58 @@ async function renderAdminHorarios() {
       <button class="primary small" onclick="adminAdicionarHorario()">Adicionar</button>
     </div>
     <div id="listaHorariosAdmin" style="margin-top:18px">Carregando...</div>`;
+
   const client = adminClient();
-  const { data, error } = await client.from("horarios").select("id,data,horario,disponivel").order("data").order("horario");
-  if (error) { document.getElementById("listaHorariosAdmin").textContent = "Não foi possível carregar os horários."; return; }
-  document.getElementById("listaHorariosAdmin").innerHTML = (data || []).map(r => `
-    <div style="display:flex;justify-content:space-between;gap:10px;padding:10px;border-bottom:1px solid #eee;">
-      <span>${r.data} — ${String(r.horario).slice(0,5)} — ${r.disponivel ? "Disponível" : "Indisponível"}</span>
-      <button class="primary small" onclick="adminAlterarHorario(${r.id}, ${r.disponivel})">${r.disponivel ? "Bloquear" : "Liberar"}</button>
-    </div>`).join("") || "Nenhum horário cadastrado ainda.";
+
+  const [{ data: horarios, error: horariosError }, { data: agendamentos, error: agendamentosError }] =
+    await Promise.all([
+      client.from("horarios")
+        .select("id,data,horario,disponivel")
+        .order("data")
+        .order("horario"),
+      client.from("agendamentos")
+        .select("id,data,horario,status")
+        .in("status", ["confirmado", "agendado", "pendente"])
+    ]);
+
+  const lista = document.getElementById("listaHorariosAdmin");
+
+  if (horariosError) {
+    console.error(horariosError);
+    lista.textContent = "Não foi possível carregar os horários.";
+    return;
+  }
+
+  if (agendamentosError) {
+    console.error(agendamentosError);
+  }
+
+  const ocupados = new Set(
+    (agendamentos || []).map(a => `${a.data}|${String(a.horario).slice(0,5)}`)
+  );
+
+  lista.innerHTML = (horarios || []).map(r => {
+    const chave = `${r.data}|${String(r.horario).slice(0,5)}`;
+    const ocupado = ocupados.has(chave);
+    const situacao = ocupado ? "Ocupado — cliente agendada" : (r.disponivel ? "Disponível" : "Indisponível");
+    const botao = r.disponivel
+      ? "Bloquear"
+      : "Liberar";
+
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px;border-bottom:1px solid #eee;flex-wrap:wrap;">
+        <span>
+          <strong>${r.data} — ${String(r.horario).slice(0,5)}</strong>
+          — ${situacao}
+        </span>
+        <button type="button"
+          style="display:inline-block;cursor:pointer;"
+          class="primary small"
+          onclick="adminAlterarHorario(${r.id}, ${!!r.disponivel})">
+          ${botao}
+        </button>
+      </div>`;
+  }).join("") || "Nenhum horário cadastrado ainda.";
 }
 
 window.adminAdicionarFoto = async function () {
@@ -1102,11 +1110,7 @@ async function renderAdminClientes() {
   const lista = document.getElementById("listaClientesAdmin");
   try {
     const client = adminClient();
-    let timer;
-    const rpc = client.rpc("admin_listar_clientes");
-    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Tempo esgotado ao carregar clientes. Verifique a conexão com o Supabase.")), 10000); });
-    const { data, error } = await Promise.race([rpc, timeout]);
-    clearTimeout(timer);
+    const { data, error } = await client.rpc("admin_listar_clientes");
     if (error) throw error;
     const clientes = Array.isArray(data) ? data : [];
     if (!clientes.length) {
@@ -1130,7 +1134,7 @@ async function renderAdminClientes() {
     `).join("");
   } catch (error) {
     console.error("Erro ao carregar clientes:", error);
-    if (lista) lista.innerHTML = `<div style="padding:16px;border:1px solid #ead7df;border-radius:16px;background:#fff;"><strong>Não foi possível carregar as clientes.</strong><br><small>${escapeHtml(error?.message || "Erro desconhecido")}</small></div>`;
+    if (lista) lista.innerHTML = `<p>Não foi possível carregar as clientes.</p><small>${escapeHtml(error?.message || "Erro desconhecido")}</small>`;
   }
 }
 
@@ -1258,73 +1262,6 @@ async function renderAdminAvisos() {
   `).join("") || "<p>Nenhum aviso cadastrado ainda.</p>";
 }
 
-async function renderAdminDiagnostico() {
-  const conteudo = document.getElementById("adminConteudo");
-  if (!conteudo) return;
-  conteudo.innerHTML = `
-    <h3>🔎 Diagnóstico do site</h3>
-    <p class="muted">O próprio site vai verificar onde Clientes e Agendamentos estão travando. Não altera clientes, agendamentos ou financeiro.</p>
-    <div id="diagnosticoAdmin" style="display:grid;gap:10px;margin-top:14px;"></div>
-  `;
-  const box = document.getElementById("diagnosticoAdmin");
-  const inicio = Date.now();
-  const resultados = [];
-  const mostrar = () => {
-    box.innerHTML = resultados.map(r => `<div style="padding:13px 15px;border:1px solid #ead7df;border-radius:14px;background:#fff;">
-      <strong>${r.ok ? "✅" : "❌"} ${escapeHtml(r.titulo)}</strong>
-      <div style="margin-top:5px;white-space:pre-wrap;">${escapeHtml(r.msg)}</div>
-    </div>`).join("") + `<p class="muted">Diagnóstico concluído em ${Date.now()-inicio} ms.</p>`;
-  };
-  const add = (ok,titulo,msg) => { resultados.push({ok,titulo,msg}); mostrar(); };
-  try {
-    const client = adminClient();
-    const { data: sessionData, error: sessionError } = await client.auth.getSession();
-    const user = sessionData?.session?.user;
-    if (sessionError) add(false,"Sessão",sessionError.message || "Erro ao verificar sessão.");
-    else if (!user) add(false,"Sessão","Nenhuma sessão autenticada encontrada.");
-    else add(true,"Sessão","Usuária autenticada: " + (user.email || user.id));
-
-    const admin = await client.rpc("usuario_atual_e_admin");
-    if (admin.error) add(false,"Acesso de administradora",admin.error.message || "Erro na função usuario_atual_e_admin.");
-    else add(admin.data === true,"Acesso de administradora",admin.data === true ? "Administradora reconhecida." : "Usuária autenticada, mas não reconhecida como administradora.");
-
-    const testarRPC = async (nome, limite=7000) => {
-      const t0 = Date.now();
-      let timer;
-      try {
-        const promessa = client.rpc(nome);
-        const timeout = new Promise((_, reject) => { timer=setTimeout(() => reject(new Error("TIMEOUT: a função não respondeu em 7 segundos")), limite); });
-        const r = await Promise.race([promessa, timeout]);
-        clearTimeout(timer);
-        return { ...r, ms: Date.now()-t0 };
-      } catch(e) { clearTimeout(timer); return { data:null, error:e, ms:Date.now()-t0 }; }
-    };
-
-    const clientes = await testarRPC("admin_listar_clientes");
-    if (clientes.error) add(false,"RPC Clientes",`${clientes.error.message || clientes.error}
-Tempo: ${clientes.ms} ms`);
-    else add(true,"RPC Clientes",`Resposta recebida em ${clientes.ms} ms. Tipo: ${Array.isArray(clientes.data) ? "lista" : typeof clientes.data}. Registros: ${Array.isArray(clientes.data) ? clientes.data.length : "formato não-lista"}.`);
-
-    const ag = await testarRPC("admin_listar_agendamentos");
-    if (ag.error) add(false,"RPC Agendamentos",`${ag.error.message || ag.error}
-Tempo: ${ag.ms} ms`);
-    else {
-      const tipo = Array.isArray(ag.data) ? "lista" : typeof ag.data;
-      const qtd = Array.isArray(ag.data) ? ag.data.length : (Array.isArray(ag.data?.agendamentos) ? ag.data.agendamentos.length : "formato desconhecido");
-      add(true,"RPC Agendamentos",`Resposta recebida em ${ag.ms} ms. Tipo: ${tipo}. Registros: ${qtd}.`);
-    }
-
-    const versao = await client.rpc("admin_listar_agendamentos");
-    if (!versao.error) {
-      const formatoNovo = Array.isArray(versao.data);
-      const formatoAntigo = versao.data && Array.isArray(versao.data.agendamentos);
-      add(formatoNovo || formatoAntigo,"Formato dos Agendamentos",formatoNovo ? "Formato atual: lista de agendamentos." : formatoAntigo ? "Formato antigo: objeto com agendamentos." : "Formato inesperado retornado pelo banco.");
-    }
-  } catch (e) {
-    add(false,"Erro geral do diagnóstico",e?.message || String(e));
-  }
-}
-
 async function renderAdminAgendamentos() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
@@ -1332,13 +1269,12 @@ async function renderAdminAgendamentos() {
   const lista = document.getElementById("listaAgendamentosAdmin");
   try {
     const client = adminClient();
-    let timer;
-    const rpc = client.rpc("admin_listar_agendamentos");
-    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Tempo esgotado ao carregar agendamentos. Verifique a conexão com o Supabase.")), 10000); });
-    const { data, error } = await Promise.race([rpc, timeout]);
-    clearTimeout(timer);
+    const { data, error } = await client.rpc("admin_listar_agendamentos");
     if (error) throw error;
-    const agendamentos = Array.isArray(data) ? data : (Array.isArray(data?.agendamentos) ? data.agendamentos : []);
+    const payload = data && !Array.isArray(data) ? data : { agendamentos: data || [], clientes: [] };
+    const agendamentos = Array.isArray(payload.agendamentos) ? payload.agendamentos : [];
+    const clientes = Array.isArray(payload.clientes) ? payload.clientes : [];
+    const cm = new Map(clientes.map(c => [String(c.id), c]));
     const pagamentos = { pix:"Pix", dinheiro:"Dinheiro", debito:"Cartão de débito", credito:"Cartão de crédito", pagar_depois:"Pagar depois" };
     const statusLabel = s => ({ confirmado:"Confirmado", agendado:"Agendado", realizado:"Realizado", cancelado:"Cancelado", faltou:"Faltou" }[String(s || "").toLowerCase()] || s || "Agendado");
     if (!agendamentos.length) {
@@ -1346,15 +1282,14 @@ async function renderAdminAgendamentos() {
       return;
     }
     lista.innerHTML = agendamentos.map(a => {
+      const c = cm.get(String(a.cliente_id));
       const pagamento = pagamentos[a.forma_pagamento] || "Não informado";
-      const nome = a.cliente_nome || "Cliente";
-      const whatsapp = a.cliente_whatsapp || "";
       const trocoInfo = a.forma_pagamento === "dinheiro" && a.troco_para != null ? `<br>Troco para: ${money(Number(a.troco_para))}${a.troco != null ? ` — Troco: ${money(Number(a.troco))}` : ""}` : "";
       const podeFechar = !["cancelado","faltou","realizado"].includes(String(a.status || "").toLowerCase());
       return `<div style="padding:14px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
         <strong>📅 ${escapeHtml(String(a.data || ""))} — ${escapeHtml(String(a.horario || "").slice(0,5))}</strong>
         <div style="margin-top:6px;">💅 ${escapeHtml(a.servico || "Serviço não informado")}</div>
-        <div>👤 ${escapeHtml(nome)}${whatsapp ? ` — ${escapeHtml(whatsapp)}` : ""}</div>
+        <div>👤 ${escapeHtml(c?.nome || "Cliente")}${c?.whatsapp ? ` — ${escapeHtml(c.whatsapp)}` : ""}</div>
         <div>Status: <strong>${escapeHtml(statusLabel(a.status))}</strong></div>
         <div>Pagamento: ${escapeHtml(pagamento)} — ${escapeHtml(a.pagamento_status || "pendente")}${trocoInfo}</div>
         ${podeFechar ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
@@ -1365,8 +1300,8 @@ async function renderAdminAgendamentos() {
       </div>`;
     }).join("");
   } catch (error) {
-    console.error("Erro ao carregar agendamentos:", error);
-    if (lista) lista.innerHTML = `<div style="padding:16px;border:1px solid #ead7df;border-radius:16px;background:#fff;"><strong>Não foi possível carregar os agendamentos.</strong><br><small>${escapeHtml(error?.message || "Erro desconhecido")}</small></div>`;
+    console.error("Erro REAL ao carregar agendamentos:", error);
+    if (lista) lista.innerHTML = `<p>Não foi possível carregar os agendamentos.</p><small>${escapeHtml(error?.message || "Erro desconhecido")}</small>`;
   }
 }
 
@@ -1374,10 +1309,7 @@ window.adminMarcarAgendamento = async function(id, status) {
   const nomes = {realizado:"concluir este atendimento como realizado", faltou:"marcar este atendimento como falta", cancelado:"cancelar este agendamento"};
   if (!confirm(`Deseja ${nomes[status] || "alterar o status"}?`)) return;
   const client = adminClient();
-  const { error } = await client.rpc("admin_marcar_agendamento", {
-    p_agendamento_id: Number(id),
-    p_status: status
-  });
+  const { error } = await client.rpc("admin_marcar_agendamento", { p_agendamento_id: Number(id), p_status: status });
   if (error) { console.error(error); return alert("Não foi possível atualizar o agendamento."); }
   if (status === "realizado") {
     const { data: a } = await client.from("agendamentos").select("id,cliente_id,servico,data,forma_pagamento,pagamento_status").eq("id", id).single();
@@ -1531,39 +1463,41 @@ window.abrirAdminAba = async function (aba) {
   const resultado = await verificarAdmin();
   if (!resultado.ok) { alert(resultado.message); return; }
   const area = document.getElementById("areaDebora");
-  if (!area) return;
-  area.style.display = "block";
+  if (area) area.style.display = "block";
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
+  const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", clientes:"👥 Clientes", agendamentos:"📋 Agendamentos", financeiro:"💰 Financeiro", avisos:"📢 Avisos e Novidades" };
   const container = area.querySelector(".admin-container") || area;
-
-  // CORREÇÃO DEFINITIVA: a barra antiga pode estar fora de .admin-container.
-  // Limpa qualquer barra de abas existente DENTRO da Área da Débora e cria uma única barra oficial.
-  area.querySelectorAll(".admin-tabs").forEach(el => el.remove());
-  container.insertAdjacentHTML("afterbegin", adminBotoes());
-  const tabs = container.querySelector(".admin-tabs");
-  tabs?.querySelectorAll("[data-admin-aba]").forEach(botao => {
-    botao.classList.toggle("active", botao.getAttribute("data-admin-aba") === aba);
-  });
-
-  const carregadores = {
-    horarios:renderAdminHorarios,
-    precos:renderAdminPrecos,
-    fotos:renderAdminFotos,
-    promocoes:renderAdminPromocoes,
-    vip:renderAdminVip,
-    clientes:renderAdminClientes,
-    agendamentos:renderAdminAgendamentos,
-    financeiro:renderAdminFinanceiro,
-    avisos:renderAdminAvisos,
-    diagnostico:renderAdminDiagnostico
-  };
-  try {
-    await (carregadores[aba] || renderAdminHorarios)();
-  } catch (error) {
-    console.error(`Erro ao abrir a aba ${aba}:`, error);
-    conteudo.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;"><strong>Não foi possível carregar esta área.</strong><p class="muted">${escapeHtml(error?.message || "Erro desconhecido")}</p></div>`;
+  const atual = document.getElementById("adminConteudo");
+  let tabs = container.querySelector(".admin-tabs");
+  if (!tabs) {
+    if (atual && atual.parentElement === container) {
+      atual.insertAdjacentHTML("beforebegin", adminBotoes());
+    } else {
+      container.insertAdjacentHTML("beforeend", adminBotoes());
+    }
+    tabs = container.querySelector(".admin-tabs");
   }
+
+  // O HTML antigo já possui uma barra de abas. Nesse caso, acrescenta
+  // APENAS a aba de Avisos e Novidades, sem duplicar nem alterar as outras.
+  if (tabs && !tabs.querySelector("[data-admin-aba='avisos']")) {
+    const botaoAvisos = document.createElement("button");
+    botaoAvisos.type = "button";
+    botaoAvisos.className = "primary small";
+    botaoAvisos.setAttribute("data-admin-aba", "avisos");
+    botaoAvisos.textContent = "📢 Avisos e Novidades";
+    botaoAvisos.addEventListener("click", () => window.abrirAdminAba("avisos"));
+    tabs.appendChild(botaoAvisos);
+  }
+
+  if (!atual) {
+    atual = document.createElement("div");
+    atual.id = "adminConteudo";
+    container.appendChild(atual);
+  }
+  const carregadores = { horarios:renderAdminHorarios, precos:renderAdminPrecos, fotos:renderAdminFotos, promocoes:renderAdminPromocoes, vip:renderAdminVip, clientes:renderAdminClientes, agendamentos:renderAdminAgendamentos, financeiro:renderAdminFinanceiro, avisos:renderAdminAvisos };
+  await (carregadores[aba] || renderAdminHorarios)();
 };
 
 window.sairAdmin = async function () {
