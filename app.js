@@ -824,68 +824,9 @@ window.abrirAreaDebora = async function () {
   window.abrirAdminAba("horarios");
 };
 
-function aplicarEstiloAreaDebora() {
-  if (document.getElementById("debora-admin-style")) return;
-  const style = document.createElement("style");
-  style.id = "debora-admin-style";
-  style.textContent = `
-    #areaDebora {
-      position: relative;
-      margin-top: 24px;
-      padding: 22px;
-      border-radius: 24px;
-      background: linear-gradient(180deg, #fff8fb 0%, #fff 100%);
-      border: 1px solid #ead7df;
-      box-shadow: 0 12px 35px rgba(90, 45, 65, .08);
-    }
-    #areaDebora .admin-header {
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:14px;
-      flex-wrap:wrap;
-      margin-bottom: 8px;
-    }
-    #areaDebora .admin-tabs {
-      display:flex;
-      flex-wrap:wrap;
-      gap:8px;
-      margin:18px 0;
-      padding:10px;
-      border-radius:18px;
-      background:#fff;
-      border:1px solid #ead7df;
-      box-shadow:0 6px 18px rgba(90,45,65,.06);
-    }
-    #areaDebora .admin-tabs button {
-      border-radius:12px;
-      min-height:40px;
-      cursor:pointer;
-      transition:transform .15s ease, box-shadow .15s ease;
-    }
-    #areaDebora .admin-tabs button:hover {
-      transform:translateY(-1px);
-      box-shadow:0 5px 12px rgba(90,45,65,.10);
-    }
-    #areaDebora #adminConteudo {
-      margin-top: 8px;
-    }
-    #areaDebora #adminConteudo > h3 {
-      margin-top: 4px;
-      margin-bottom: 6px;
-    }
-    @media (max-width: 600px) {
-      #areaDebora { padding:16px; border-radius:20px; }
-      #areaDebora .admin-tabs { gap:6px; padding:8px; }
-      #areaDebora .admin-tabs button { flex:1 1 calc(50% - 6px); }
-    }
-  `;
-  document.head.appendChild(style);
-}
-
 function adminBotoes() {
   return `
-    <div class="admin-tabs" aria-label="Menu da Área da Débora">
+    <div class="admin-tabs" data-admin-menu="principal" aria-label="Menu da Área da Débora">
       <button type="button" class="primary small" data-admin-aba="horarios" onclick="abrirAdminAba('horarios')">📅 Horários</button>
       <button type="button" class="primary small" data-admin-aba="precos" onclick="abrirAdminAba('precos')">💰 Preços</button>
       <button type="button" class="primary small" data-admin-aba="fotos" onclick="abrirAdminAba('fotos')">📸 Fotos</button>
@@ -897,6 +838,21 @@ function adminBotoes() {
       <button type="button" class="primary small" data-admin-aba="avisos" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
     </div>
   `;
+}
+
+function aplicarVisualAreaDebora() {
+  if (document.getElementById('debora-admin-style')) return;
+  const style = document.createElement('style');
+  style.id = 'debora-admin-style';
+  style.textContent = `
+    #areaDebora { margin-top:24px; padding:22px; border:1px solid #ead7df; border-radius:24px; background:linear-gradient(180deg,#fffafd 0%,#fff 100%); box-shadow:0 12px 35px rgba(80,30,50,.08); }
+    #areaDebora .admin-tabs[data-admin-menu="principal"] { display:flex; flex-wrap:wrap; gap:8px; margin:0 0 20px; padding:10px; border-radius:18px; background:#fff; border:1px solid #ead7df; }
+    #areaDebora .admin-tabs[data-admin-menu="principal"] button { border-radius:12px; transition:.2s ease; }
+    #areaDebora .admin-tabs[data-admin-menu="principal"] button.active { box-shadow:0 0 0 2px rgba(145,60,90,.16); transform:translateY(-1px); }
+    #areaDebora #adminConteudo { padding:18px; border-radius:20px; background:rgba(255,255,255,.86); border:1px solid #f0e2e8; }
+    @media(max-width:700px){ #areaDebora{padding:14px;border-radius:18px;} #areaDebora .admin-tabs[data-admin-menu="principal"] button{flex:1 1 calc(50% - 8px);} }
+  `;
+  document.head.appendChild(style);
 }
 
 async function carregarServicosAdmin() {
@@ -1298,24 +1254,33 @@ async function renderAdminAgendamentos() {
   const lista = document.getElementById("listaAgendamentosAdmin");
   try {
     const client = adminClient();
-    const { data, error } = await client.rpc("admin_listar_agendamentos");
-    if (error) throw error;
-    const payload = data && !Array.isArray(data) ? data : { agendamentos: data || [], clientes: [] };
-    const agendamentos = Array.isArray(payload.agendamentos) ? payload.agendamentos : [];
-    const clientes = Array.isArray(payload.clientes) ? payload.clientes : [];
-    const cm = new Map(clientes.map(c => [String(c.id), c]));
+
+    // Para a Área da Débora, fazemos a leitura diretamente das tabelas.
+    // A conta administrativa já está autenticada e este caminho evita que
+    // uma RPC antiga/indisponível deixe a tela presa em “Carregando...”.
+    const [{ data: agendamentos, error: erroAg }, { data: clientes, error: erroCli }] = await Promise.all([
+      client.from("agendamentos").select("*").order("data", { ascending: false }).order("horario", { ascending: false }),
+      client.from("Clientes").select("id,nome,whatsapp,email").order("nome")
+    ]);
+
+    if (erroAg) throw erroAg;
+    if (erroCli) throw erroCli;
+
+    const cm = new Map((clientes || []).map(c => [String(c.id), c]));
     const pagamentos = { pix:"Pix", dinheiro:"Dinheiro", debito:"Cartão de débito", credito:"Cartão de crédito", pagar_depois:"Pagar depois" };
     const statusLabel = s => ({ confirmado:"Confirmado", agendado:"Agendado", realizado:"Realizado", cancelado:"Cancelado", faltou:"Faltou" }[String(s || "").toLowerCase()] || s || "Agendado");
-    if (!agendamentos.length) {
-      lista.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;">Nenhum agendamento cadastrado ainda. 💗</div>`;
+
+    if (!(agendamentos || []).length) {
+      lista.innerHTML = `<div style="padding:20px;border:1px solid #ead7df;border-radius:16px;background:#fff;text-align:center;">Nenhum agendamento cadastrado ainda. 💗</div>`;
       return;
     }
+
     lista.innerHTML = agendamentos.map(a => {
       const c = cm.get(String(a.cliente_id));
       const pagamento = pagamentos[a.forma_pagamento] || "Não informado";
       const trocoInfo = a.forma_pagamento === "dinheiro" && a.troco_para != null ? `<br>Troco para: ${money(Number(a.troco_para))}${a.troco != null ? ` — Troco: ${money(Number(a.troco))}` : ""}` : "";
       const podeFechar = !["cancelado","faltou","realizado"].includes(String(a.status || "").toLowerCase());
-      return `<div style="padding:14px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
+      return `<div style="padding:16px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;box-shadow:0 4px 12px rgba(80,30,50,.04);">
         <strong>📅 ${escapeHtml(String(a.data || ""))} — ${escapeHtml(String(a.horario || "").slice(0,5))}</strong>
         <div style="margin-top:6px;">💅 ${escapeHtml(a.servico || "Serviço não informado")}</div>
         <div>👤 ${escapeHtml(c?.nome || "Cliente")}${c?.whatsapp ? ` — ${escapeHtml(c.whatsapp)}` : ""}</div>
@@ -1330,7 +1295,7 @@ async function renderAdminAgendamentos() {
     }).join("");
   } catch (error) {
     console.error("Erro REAL ao carregar agendamentos:", error);
-    if (lista) lista.innerHTML = `<p>Não foi possível carregar os agendamentos.</p><small>${escapeHtml(error?.message || "Erro desconhecido")}</small>`;
+    if (lista) lista.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;"><strong>Não foi possível carregar os agendamentos.</strong><br><small>${escapeHtml(error?.message || "Erro desconhecido")}</small></div>`;
   }
 }
 
@@ -1493,31 +1458,29 @@ window.abrirAdminAba = async function (aba) {
   if (!resultado.ok) { alert(resultado.message); return; }
 
   const area = document.getElementById("areaDebora");
-  if (!area) return;
-  area.style.display = "block";
-  aplicarEstiloAreaDebora();
+  if (area) { area.style.display = "block"; aplicarVisualAreaDebora(); }
 
-  // Remove somente as barras antigas da Área da Débora e cria uma única barra oficial.
-  // Não mexe no restante do site nem em index.html/styles.css.
-  area.querySelectorAll(".admin-tabs").forEach(el => el.remove());
+  const conteudo = document.getElementById("adminConteudo");
+  if (!conteudo) return;
+  const container = area.querySelector(".admin-container") || area;
 
-  let container = area.querySelector(".admin-container");
-  if (!container) container = area;
+  // Mantém uma única barra de navegação: remove somente barras antigas
+  // que não pertençam ao novo menu data-admin-menu="principal".
+  container.querySelectorAll(".admin-tabs").forEach(barra => {
+    if (barra.getAttribute("data-admin-menu") !== "principal") barra.remove();
+  });
 
-  let conteudo = document.getElementById("adminConteudo");
-  if (!conteudo || !container.contains(conteudo)) {
-    conteudo = document.createElement("div");
-    conteudo.id = "adminConteudo";
+  let tabs = container.querySelector('.admin-tabs[data-admin-menu="principal"]');
+  if (!tabs) {
+    conteudo.insertAdjacentHTML("beforebegin", adminBotoes());
+    tabs = container.querySelector('.admin-tabs[data-admin-menu="principal"]');
   }
 
-  container.insertAdjacentHTML("afterbegin", adminBotoes());
-  const tabs = container.querySelector(".admin-tabs");
-  if (conteudo.parentElement !== container) container.appendChild(conteudo);
-  else if (tabs.nextElementSibling !== conteudo) container.appendChild(conteudo);
-
-  tabs?.querySelectorAll("[data-admin-aba]").forEach(botao => {
-    botao.classList.toggle("active", botao.getAttribute("data-admin-aba") === aba);
-  });
+  if (tabs) {
+    tabs.querySelectorAll("[data-admin-aba]").forEach(botao => {
+      botao.classList.toggle("active", botao.getAttribute("data-admin-aba") === aba);
+    });
+  }
 
   const carregadores = {
     horarios: renderAdminHorarios,
