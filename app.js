@@ -824,18 +824,77 @@ window.abrirAreaDebora = async function () {
   window.abrirAdminAba("horarios");
 };
 
+function aplicarEstiloAreaDebora() {
+  if (document.getElementById("debora-admin-style")) return;
+  const style = document.createElement("style");
+  style.id = "debora-admin-style";
+  style.textContent = `
+    #areaDebora {
+      position: relative;
+      margin-top: 24px;
+      padding: 22px;
+      border-radius: 24px;
+      background: linear-gradient(180deg, #fff8fb 0%, #fff 100%);
+      border: 1px solid #ead7df;
+      box-shadow: 0 12px 35px rgba(90, 45, 65, .08);
+    }
+    #areaDebora .admin-header {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:14px;
+      flex-wrap:wrap;
+      margin-bottom: 8px;
+    }
+    #areaDebora .admin-tabs {
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+      margin:18px 0;
+      padding:10px;
+      border-radius:18px;
+      background:#fff;
+      border:1px solid #ead7df;
+      box-shadow:0 6px 18px rgba(90,45,65,.06);
+    }
+    #areaDebora .admin-tabs button {
+      border-radius:12px;
+      min-height:40px;
+      cursor:pointer;
+      transition:transform .15s ease, box-shadow .15s ease;
+    }
+    #areaDebora .admin-tabs button:hover {
+      transform:translateY(-1px);
+      box-shadow:0 5px 12px rgba(90,45,65,.10);
+    }
+    #areaDebora #adminConteudo {
+      margin-top: 8px;
+    }
+    #areaDebora #adminConteudo > h3 {
+      margin-top: 4px;
+      margin-bottom: 6px;
+    }
+    @media (max-width: 600px) {
+      #areaDebora { padding:16px; border-radius:20px; }
+      #areaDebora .admin-tabs { gap:6px; padding:8px; }
+      #areaDebora .admin-tabs button { flex:1 1 calc(50% - 6px); }
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 function adminBotoes() {
   return `
-    <div class="admin-tabs" style="display:flex;flex-wrap:wrap;gap:8px;margin:18px 0;">
-      <button class="primary small" onclick="abrirAdminAba('horarios')">📅 Horários</button>
-      <button class="primary small" onclick="abrirAdminAba('precos')">💰 Preços</button>
-      <button class="primary small" onclick="abrirAdminAba('fotos')">📸 Fotos</button>
-      <button class="primary small" onclick="abrirAdminAba('promocoes')">🎀 Promoções</button>
-      <button class="primary small" onclick="abrirAdminAba('vip')">⭐ VIP Fidelidade</button>
-      <button class="primary small" onclick="abrirAdminAba('clientes')">👥 Clientes</button>
-      <button class="primary small" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
-      <button class="primary small" data-admin-aba="financeiro" onclick="abrirAdminAba('financeiro')">💰 Financeiro</button>
-      <button class="primary small" data-admin-aba="avisos" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
+    <div class="admin-tabs" aria-label="Menu da Área da Débora">
+      <button type="button" class="primary small" data-admin-aba="horarios" onclick="abrirAdminAba('horarios')">📅 Horários</button>
+      <button type="button" class="primary small" data-admin-aba="precos" onclick="abrirAdminAba('precos')">💰 Preços</button>
+      <button type="button" class="primary small" data-admin-aba="fotos" onclick="abrirAdminAba('fotos')">📸 Fotos</button>
+      <button type="button" class="primary small" data-admin-aba="promocoes" onclick="abrirAdminAba('promocoes')">🎀 Promoções</button>
+      <button type="button" class="primary small" data-admin-aba="vip" onclick="abrirAdminAba('vip')">⭐ VIP Fidelidade</button>
+      <button type="button" class="primary small" data-admin-aba="clientes" onclick="abrirAdminAba('clientes')">👥 Clientes</button>
+      <button type="button" class="primary small" data-admin-aba="agendamentos" onclick="abrirAdminAba('agendamentos')">📋 Agendamentos</button>
+      <button type="button" class="primary small" data-admin-aba="financeiro" onclick="abrirAdminAba('financeiro')">💰 Financeiro</button>
+      <button type="button" class="primary small" data-admin-aba="avisos" onclick="abrirAdminAba('avisos')">📢 Avisos e Novidades</button>
     </div>
   `;
 }
@@ -1432,42 +1491,53 @@ async function finMostrarRelatorios(){
 window.abrirAdminAba = async function (aba) {
   const resultado = await verificarAdmin();
   if (!resultado.ok) { alert(resultado.message); return; }
+
   const area = document.getElementById("areaDebora");
-  if (area) area.style.display = "block";
-  const conteudo = document.getElementById("adminConteudo");
-  if (!conteudo) return;
-  const titulos = { horarios:"📅 Horários", precos:"💰 Preços", fotos:"📸 Fotos", promocoes:"🎀 Promoções", vip:"⭐ VIP Fidelidade", clientes:"👥 Clientes", agendamentos:"📋 Agendamentos", financeiro:"💰 Financeiro", avisos:"📢 Avisos e Novidades" };
-  const container = area.querySelector(".admin-container") || area;
-  const atual = document.getElementById("adminConteudo");
-  let tabs = container.querySelector(".admin-tabs");
-  if (!tabs) {
-    if (atual && atual.parentElement === container) {
-      atual.insertAdjacentHTML("beforebegin", adminBotoes());
-    } else {
-      container.insertAdjacentHTML("beforeend", adminBotoes());
-    }
-    tabs = container.querySelector(".admin-tabs");
+  if (!area) return;
+  area.style.display = "block";
+  aplicarEstiloAreaDebora();
+
+  // Remove somente as barras antigas da Área da Débora e cria uma única barra oficial.
+  // Não mexe no restante do site nem em index.html/styles.css.
+  area.querySelectorAll(".admin-tabs").forEach(el => el.remove());
+
+  let container = area.querySelector(".admin-container");
+  if (!container) container = area;
+
+  let conteudo = document.getElementById("adminConteudo");
+  if (!conteudo || !container.contains(conteudo)) {
+    conteudo = document.createElement("div");
+    conteudo.id = "adminConteudo";
   }
 
-  // O HTML antigo já possui uma barra de abas. Nesse caso, acrescenta
-  // APENAS a aba de Avisos e Novidades, sem duplicar nem alterar as outras.
-  if (tabs && !tabs.querySelector("[data-admin-aba='avisos']")) {
-    const botaoAvisos = document.createElement("button");
-    botaoAvisos.type = "button";
-    botaoAvisos.className = "primary small";
-    botaoAvisos.setAttribute("data-admin-aba", "avisos");
-    botaoAvisos.textContent = "📢 Avisos e Novidades";
-    botaoAvisos.addEventListener("click", () => window.abrirAdminAba("avisos"));
-    tabs.appendChild(botaoAvisos);
-  }
+  container.insertAdjacentHTML("afterbegin", adminBotoes());
+  const tabs = container.querySelector(".admin-tabs");
+  if (conteudo.parentElement !== container) container.appendChild(conteudo);
+  else if (tabs.nextElementSibling !== conteudo) container.appendChild(conteudo);
 
-  if (!atual) {
-    atual = document.createElement("div");
-    atual.id = "adminConteudo";
-    container.appendChild(atual);
+  tabs?.querySelectorAll("[data-admin-aba]").forEach(botao => {
+    botao.classList.toggle("active", botao.getAttribute("data-admin-aba") === aba);
+  });
+
+  const carregadores = {
+    horarios: renderAdminHorarios,
+    precos: renderAdminPrecos,
+    fotos: renderAdminFotos,
+    promocoes: renderAdminPromocoes,
+    vip: renderAdminVip,
+    clientes: renderAdminClientes,
+    agendamentos: renderAdminAgendamentos,
+    financeiro: renderAdminFinanceiro,
+    avisos: renderAdminAvisos
+  };
+
+  const carregar = carregadores[aba] || renderAdminHorarios;
+  try {
+    await carregar();
+  } catch (error) {
+    console.error(`Erro ao abrir a aba ${aba}:`, error);
+    conteudo.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;"><strong>Não foi possível carregar esta área.</strong><p class="muted">${escapeHtml(error?.message || "Erro desconhecido")}</p></div>`;
   }
-  const carregadores = { horarios:renderAdminHorarios, precos:renderAdminPrecos, fotos:renderAdminFotos, promocoes:renderAdminPromocoes, vip:renderAdminVip, clientes:renderAdminClientes, agendamentos:renderAdminAgendamentos, financeiro:renderAdminFinanceiro, avisos:renderAdminAvisos };
-  await (carregadores[aba] || renderAdminHorarios)();
 };
 
 window.sairAdmin = async function () {
