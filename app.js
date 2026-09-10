@@ -1646,12 +1646,87 @@ function atualizarCartaoVIP(pontos, vip) {
   }
 }
 
+async function abrirDetalhesNivelVIP() {
+  const client = adminClient();
+  const { data: sessionData } = await client.auth.getSession();
+
+  if (!sessionData?.session?.user) {
+    openVipModal();
+    return;
+  }
+
+  const { data: cliente, error: clienteError } = await client
+    .from("Clientes")
+    .select("id,nome")
+    .eq("user_id", sessionData.session.user.id)
+    .maybeSingle();
+
+  if (clienteError || !cliente) return;
+
+  const { count, error } = await client
+    .from("agendamentos")
+    .select("id", { count: "exact", head: true })
+    .eq("cliente_id", cliente.id)
+    .eq("status", "realizado");
+
+  if (error) {
+    console.error("Erro ao carregar detalhes do nível VIP:", error);
+    return;
+  }
+
+  const total = Math.max(0, Number(count || 0));
+  const nivel = total <= 5
+    ? { nome: "BRONZE", atual: total, limite: 5, proximo: "PRATA", proximoLimite: 6 }
+    : total <= 10
+      ? { nome: "PRATA", atual: total, limite: 10, proximo: "OURO", proximoLimite: 11 }
+      : total <= 20
+        ? { nome: "OURO", atual: total, limite: 20, proximo: "DIAMANTE", proximoLimite: 21 }
+        : { nome: "DIAMANTE", atual: Math.min(total, 30), limite: 30, proximo: null, proximoLimite: null };
+
+  const percentual = nivel.nome === "DIAMANTE" && total >= 30
+    ? 100
+    : Math.min(100, Math.round((nivel.atual / nivel.limite) * 100));
+
+  let mensagem;
+  if (nivel.nome === "DIAMANTE" && total >= 30) {
+    mensagem = "👑 Você alcançou o nível máximo! Continue cuidando das suas unhas com a Débora! 💗";
+  } else {
+    const falta = nivel.proximoLimite - total;
+    mensagem = falta === 1
+      ? `✨ Falta apenas <strong>1 unha realizada</strong> para você chegar ao nível ${nivel.proximo}!`
+      : `✨ Faltam apenas <strong>${falta} unhas realizadas</strong> para você chegar ao nível ${nivel.proximo}!`;
+  }
+
+  showModal(`
+    <div style="text-align:center;">
+      <div style="font-size:42px;margin-bottom:4px;">👑</div>
+      <h2>Seu nível VIP 💗</h2>
+      <p style="margin:6px 0 16px;">Olá, <strong>${cliente.nome || "Cliente VIP"}</strong>!</p>
+      <div style="font-size:24px;font-weight:800;letter-spacing:.5px;">${nivel.nome}</div>
+      <p style="margin:8px 0 16px;">Você já realizou <strong>${total} ${total === 1 ? "unha" : "unhas"}</strong> com a Débora.</p>
+      <div style="height:14px;border-radius:999px;background:#eee;overflow:hidden;margin:12px 0 8px;">
+        <div style="height:100%;width:${percentual}%;border-radius:999px;background:linear-gradient(90deg,#d89bb8,#c98aa9);transition:width .3s;"></div>
+      </div>
+      <p style="font-size:13px;margin:0 0 18px;"><strong>${nivel.atual}/${nivel.limite}</strong> unhas para o próximo nível</p>
+      <div style="padding:14px;border-radius:14px;background:#fff7fb;margin-bottom:16px;line-height:1.5;">${mensagem}</div>
+      <p style="font-size:13px;opacity:.75;line-height:1.5;margin-bottom:18px;">💅 Só entram nessa contagem os atendimentos que a Débora marcou como <strong>Realizado</strong>. Agendamentos, faltas e cancelamentos não contam.</p>
+      <button class="primary full" onclick="closeModal()">Fechar</button>
+    </div>
+  `);
+}
+
 function configurarDetalhesVIP() {
   document.addEventListener("click", event => {
     const alvo = event.target.closest("button, a, [role='button'], .vip-stat, .vip-card");
     if (!alvo) return;
 
     const texto = (alvo.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
+
+    if (texto.includes("seu nível")) {
+      event.preventDefault();
+      abrirDetalhesNivelVIP();
+      return;
+    }
 
     if (texto.includes("pontos acumulados") || texto.includes("pontos")) {
       const { cliente } = getCurrentClient();
