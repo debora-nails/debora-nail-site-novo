@@ -1102,6 +1102,20 @@ async function carregarPromocoesPublicas() {
       const fimOk = !p.data_fim || p.data_fim >= hoje;
       return inicioOk && fimOk && p.servico && p.preco_promocional != null;
     });
+
+    // Atualiza somente o número de promoções no cartão "PROMOÇÕES" do painel VIP.
+    document.querySelectorAll(".vip-stat").forEach(card => {
+      const titulo = card.querySelector(":scope > span");
+      const valor = card.querySelector(":scope > strong");
+      if (
+        titulo &&
+        valor &&
+        titulo.textContent.trim().toLowerCase() === "promoções"
+      ) {
+        valor.textContent = String(PROMOCOES_ATIVAS.length);
+      }
+    });
+
     renderServices();
   } catch (e) {
     console.warn("Erro ao carregar promoções públicas.", e);
