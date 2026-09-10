@@ -933,45 +933,42 @@ async function renderAdminHorarios() {
 
   const client = adminClient();
 
-  const { data: horarios, error: horariosError } = await client
+  const { data: horarios, error } = await client
     .from("horarios")
     .select("id,data,horario,disponivel")
     .order("data")
     .order("horario");
 
-  if (horariosError) {
-    console.error(horariosError);
+  if (error) {
     document.getElementById("listaHorariosAdmin").textContent = "Não foi possível carregar os horários.";
     return;
   }
 
-  const { data: agendados, error: agendadosError } = await client
+  const { data: agendados } = await client
     .from("agendamentos")
     .select("data,horario,status")
     .in("status", ["confirmado", "agendado", "pendente"]);
 
-  if (agendadosError) console.error(agendadosError);
-
   const ocupados = new Set(
-    (agendados || []).map(a => `${a.data}|${String(a.horario).slice(0,5)}`)
+    (agendados || []).map(a => `${a.data}|${String(a.horario).slice(0, 5)}`)
   );
 
-  document.getElementById("listaHorariosAdmin").innerHTML = (horarios || []).map(r => {
-    const chave = `${r.data}|${String(r.horario).slice(0,5)}`;
-    const ocupado = ocupados.has(chave);
-    const situacao = ocupado
-      ? "🔴 Ocupado — cliente agendada"
-      : (r.disponivel ? "🟢 Disponível" : "⚪ Indisponível");
+  document.getElementById("listaHorariosAdmin").innerHTML =
+    (horarios || []).map(r => {
+      const chave = `${r.data}|${String(r.horario).slice(0, 5)}`;
+      const ocupado = ocupados.has(chave);
 
-    return `
-      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border-bottom:1px solid #eee;flex-wrap:wrap;">
-        <span>${r.data} — ${String(r.horario).slice(0,5)} — ${situacao}</span>
-        <button type="button" class="primary small"
-          onclick="adminAlterarHorario(${r.id}, ${r.disponivel})">
-          ${r.disponivel ? "Bloquear" : "Liberar"}
-        </button>
-      </div>`;
-  }).join("") || "Nenhum horário cadastrado ainda.";
+      return `
+        <div style="display:flex;justify-content:space-between;gap:10px;padding:10px;border-bottom:1px solid #eee;">
+          <span>
+            ${r.data} — ${String(r.horario).slice(0,5)} —
+            ${ocupado ? "Ocupado — cliente agendada" : (r.disponivel ? "Disponível" : "Indisponível")}
+          </span>
+          <button class="primary small" onclick="adminAlterarHorario(${r.id}, ${r.disponivel})">
+            ${r.disponivel ? "Bloquear" : "Liberar"}
+          </button>
+        </div>`;
+    }).join("") || "Nenhum horário cadastrado ainda.";
 }
 
 window.adminAdicionarFoto = async function () {
