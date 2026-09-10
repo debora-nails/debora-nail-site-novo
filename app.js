@@ -122,6 +122,14 @@ let SERVICES = [
       "imagens/plastica-pes-1.jpeg",
       "imagens/plastica-pes-2.jpeg"
     ]
+  ],
+
+  [
+    "Manutenção",
+    80,
+    "Manutenção das unhas para renovar a estrutura, o acabamento e manter suas unhas lindas por mais tempo.",
+    [],
+    []
   ]
 ];
 
