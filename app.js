@@ -1,139 +1,140 @@
 let SERVICES = [
+
   [
-    "Alongamento Mold F1",
-    135,
-    "Alongamento construído com molde F1, estrutura personalizada e acabamento elegante.",
-    [
-      "imagens/mold-f1-1.jpeg",
-      "imagens/mold-f1-2.jpeg"
+      "Alongamento Mold F1",
+      135,
+      "Alongamento construído com molde F1, estrutura personalizada e acabamento elegante.",
+      [
+        "imagens/mold-f1-1.jpeg",
+        "imagens/mold-f1-2.jpeg"
+      ],
+      [
+        "imagens/mold-f1-1.jpeg",
+        "imagens/mold-f1-2.jpeg"
+      ]
     ],
-    [
-      "imagens/mold-f1-1.jpeg",
-      "imagens/mold-f1-2.jpeg"
+
+  [
+      "Alongamento Fibra de Vidro",
+      140,
+      "Alongamento com fibra de vidro, resultado delicado, estruturado e personalizado.",
+      [
+        "imagens/fibra-1.jpeg",
+        "imagens/fibra-2.jpeg",
+        "imagens/fibra-nova.jpeg"
+      ],
+      [
+        "imagens/fibra-1.jpeg",
+        "imagens/fibra-2.jpeg",
+        "imagens/fibra-nova.jpeg"
+      ]
+    ],
+
+  [
+      "Banho de Gel",
+      80,
+      "Aplicação de gel sobre a unha natural para reforçar estrutura e acabamento.",
+      [
+        "imagens/banho-gel-1.jpeg",
+        "imagens/banho-gel-2.jpeg"
+      ],
+      [
+        "imagens/banho-gel-1.jpeg",
+        "imagens/banho-gel-2.jpeg"
+      ]
+    ],
+
+  [
+      "Manutenção",
+      80,
+      "Manutenção das unhas para renovar a estrutura, o acabamento e manter suas unhas lindas por mais tempo.",
+      [
+        "imagens/manutencao-1.jpeg",
+        "imagens/manutencao-2.jpeg"
+      ],
+      []
+    ],
+
+  [
+      "Postiça Realista",
+      35,
+      "Visual natural e acabamento delicado, uma opção prática para suas unhas.",
+      [
+        "imagens/postica-1.jpeg",
+        "imagens/postica-2.jpeg",
+        "imagens/postica-3.jpeg",
+        "imagens/postica-nova.jpeg"
+      ],
+      [
+        "imagens/postica-1.jpeg",
+        "imagens/postica-2.jpeg",
+        "imagens/postica-3.jpeg",
+        "imagens/postica-nova.jpeg"
+      ]
+    ],
+
+  [
+      "Soft Gel",
+      40,
+      "Alongamento com tips de gel, leve, uniforme e elegante.",
+      [
+        "imagens/soft-gel-1.jpeg",
+        "imagens/soft-gel-2.jpeg"
+      ],
+      [
+        "imagens/soft-gel-1.jpeg",
+        "imagens/soft-gel-2.jpeg"
+      ]
+    ],
+
+  [
+      "Manicure",
+      24,
+      "Cuidado das unhas das mãos, preparação, acabamento e esmaltação conforme escolha.",
+      [
+        "imagens/manicure-1.jpeg",
+        "imagens/manicure-2.jpeg"
+      ],
+      []
+    ],
+
+  [
+      "Pedicure",
+      24,
+      "Cuidado das unhas dos pés, preparação, acabamento e esmaltação conforme escolha.",
+      [
+        "imagens/pedicure-1.jpeg",
+        "imagens/pedicure-nova.jpeg"
+      ],
+      [
+        "imagens/pedicure-1.jpeg"
+      ]
+    ],
+
+  [
+      "Spa dos Pés",
+      50,
+      "Cuidado e relaxamento para os pés, com pedicure incluso.",
+      [
+        "imagens/spa-pes-novo.jpeg",
+        "imagens/spa-pes-2.jpeg"
+      ],
+      []
+    ],
+
+  [
+      "Plástica dos Pés",
+      65,
+      "Cuidado especial para melhorar a aparência e a sensação de maciez dos pés.",
+      [
+        "imagens/plastica-pes-1.jpeg",
+        "imagens/plastica-pes-2.jpeg"
+      ],
+      [
+        "imagens/plastica-pes-1.jpeg",
+        "imagens/plastica-pes-2.jpeg"
+      ]
     ]
-  ],
-
-  [
-    "Alongamento Fibra de Vidro",
-    140,
-    "Alongamento com fibra de vidro, resultado delicado, estruturado e personalizado.",
-    [
-      "imagens/fibra-1.jpeg",
-      "imagens/fibra-2.jpeg",
-      "imagens/fibra-nova.jpeg"
-    ],
-    [
-      "imagens/fibra-1.jpeg",
-      "imagens/fibra-2.jpeg",
-      "imagens/fibra-nova.jpeg"
-    ]
-  ],
-
-  [
-    "Banho de Gel",
-    80,
-    "Aplicação de gel sobre a unha natural para reforçar estrutura e acabamento.",
-    [
-      "imagens/banho-gel-1.jpeg",
-      "imagens/banho-gel-2.jpeg"
-    ],
-    [
-      "imagens/banho-gel-1.jpeg",
-      "imagens/banho-gel-2.jpeg"
-    ]
-  ],
-
-  [
-    "Postiça Realista",
-    35,
-    "Visual natural e acabamento delicado, uma opção prática para suas unhas.",
-    [
-      "imagens/postica-1.jpeg",
-      "imagens/postica-2.jpeg",
-      "imagens/postica-3.jpeg",
-      "imagens/postica-nova.jpeg"
-    ],
-    [
-      "imagens/postica-1.jpeg",
-      "imagens/postica-2.jpeg",
-      "imagens/postica-3.jpeg",
-      "imagens/postica-nova.jpeg"
-    ]
-  ],
-
-  [
-    "Soft Gel",
-    40,
-    "Alongamento com tips de gel, leve, uniforme e elegante.",
-    [
-      "imagens/soft-gel-1.jpeg",
-      "imagens/soft-gel-2.jpeg"
-    ],
-    [
-      "imagens/soft-gel-1.jpeg",
-      "imagens/soft-gel-2.jpeg"
-    ]
-  ],
-
-  [
-    "Manicure",
-    24,
-    "Cuidado das unhas das mãos, preparação, acabamento e esmaltação conforme escolha.",
-    [
-      "imagens/manicure-1.jpeg",
-      "imagens/manicure-2.jpeg"
-    ],
-    []
-  ],
-
-  [
-    "Pedicure",
-    24,
-    "Cuidado das unhas dos pés, preparação, acabamento e esmaltação conforme escolha.",
-    [
-      "imagens/pedicure-1.jpeg",
-      "imagens/pedicure-nova.jpeg"
-    ],
-    [
-      "imagens/pedicure-1.jpeg"
-    ]
-  ],
-
-  [
-    "Spa dos Pés",
-    50,
-    "Cuidado e relaxamento para os pés, com pedicure incluso.",
-    [
-      "imagens/spa-pes-novo.jpeg",
-      "imagens/spa-pes-2.jpeg"
-    ],
-    []
-  ],
-
-  [
-    "Plástica dos Pés",
-    65,
-    "Cuidado especial para melhorar a aparência e a sensação de maciez dos pés.",
-    [
-      "imagens/plastica-pes-1.jpeg",
-      "imagens/plastica-pes-2.jpeg"
-    ],
-    [
-      "imagens/plastica-pes-1.jpeg",
-      "imagens/plastica-pes-2.jpeg"
-    ]
-  ],
-
-  [
-    "Manutenção",
-    80,
-    "Manutenção das unhas para renovar a estrutura, o acabamento e manter suas unhas lindas por mais tempo.",
-    [
-      "imagens/manutencao-1.jpeg",
-      "imagens/manutencao-2.jpeg"
-    ],
-    []
-  ]
 ];
 
 function escapeHtml(value) {
