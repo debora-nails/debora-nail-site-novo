@@ -1736,6 +1736,70 @@ function configurarDetalhesVIP() {
 
     const texto = (alvo.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
 
+    // No cartão "SEU NÍVEL", o botão "VER BENEFÍCIOS" não deve abrir
+    // o cartão de 10 pontos. Ele mostra os benefícios do nível atual.
+    const cardNivel = alvo.closest(".vip-stat");
+    const tituloCardNivel = cardNivel?.querySelector(":scope > span")?.textContent?.trim().toLowerCase();
+    const botaoBeneficiosNivel = alvo.closest("button")?.textContent?.trim().toLowerCase();
+
+    if (cardNivel && tituloCardNivel === "seu nível" && botaoBeneficiosNivel?.includes("ver benefício")) {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const client = adminClient();
+      client.auth.getSession().then(async ({ data }) => {
+        if (!data?.session?.user) {
+          openVipModal();
+          return;
+        }
+
+        const { data: c } = await client
+          .from("Clientes")
+          .select("id,nome")
+          .eq("user_id", data.session.user.id)
+          .maybeSingle();
+
+        if (!c) return;
+
+        const { count } = await client
+          .from("agendamentos")
+          .select("id", { count: "exact", head: true })
+          .eq("cliente_id", c.id)
+          .eq("status", "realizado");
+
+        const total = Math.max(0, Number(count || 0));
+        const nivel = total <= 5
+          ? "BRONZE"
+          : total <= 10
+            ? "PRATA"
+            : total <= 20
+              ? "OURO"
+              : "DIAMANTE";
+
+        const beneficios = {
+          BRONZE: "💗 Você está começando sua jornada VIP com a Débora. Continue realizando seus procedimentos para avançar para o nível Prata!",
+          PRATA: "✨ Você já conquistou o nível Prata! Continue cuidando das suas unhas com a Débora para chegar ao Ouro.",
+          OURO: "👑 Você alcançou o nível Ouro! Continue realizando seus procedimentos para chegar ao Diamante.",
+          DIAMANTE: "💎 Você alcançou o nível Diamante, o nível máximo! Continue aproveitando sua experiência VIP com a Débora."
+        };
+
+        showModal(`
+          <div style="text-align:center;">
+            <div style="font-size:42px;margin-bottom:4px;">👑</div>
+            <h2>Benefícios do seu nível 💗</h2>
+            <p style="margin:8px 0 18px;">Olá, <strong>${c.nome || "Cliente VIP"}</strong>!</p>
+            <div style="font-size:24px;font-weight:800;">${nivel}</div>
+            <div style="padding:14px;border-radius:14px;background:#fff7fb;margin:18px 0;line-height:1.5;">
+              ${beneficios[nivel]}
+            </div>
+            <p style="font-size:13px;opacity:.75;line-height:1.5;">Seu nível é calculado pelos atendimentos que a Débora marcou como <strong>Realizado</strong>.</p>
+            <button class="primary full" onclick="closeModal()">Fechar</button>
+          </div>
+        `);
+      });
+      return;
+    }
+
     if (texto.includes("seu nível")) {
       event.preventDefault();
       abrirDetalhesNivelVIP();
