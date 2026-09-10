@@ -128,7 +128,10 @@ let SERVICES = [
     "Manutenção",
     80,
     "Manutenção das unhas para renovar a estrutura, o acabamento e manter suas unhas lindas por mais tempo.",
-    [],
+    [
+      "imagens/manutencao-1.jpeg",
+      "imagens/manutencao-2.jpeg"
+    ],
     []
   ]
 ];
