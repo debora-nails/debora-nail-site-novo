@@ -303,8 +303,22 @@ async function carregarHorariosDisponiveis() {
 
   if (agError) console.error(agError);
 
-  const ocupados = new Set((agendados || []).map(item => item.horario));
-  const disponiveis = (horarios || []).filter(item => !ocupados.has(item.horario));
+  // Se ainda não houver horários salvos para esta data, usa automaticamente o padrão
+  // de segunda a sábado. Quando você salvar uma data no painel, os horários daquela
+  // data passam a obedecer exatamente ao que foi configurado por você.
+  let horariosBase = horarios || [];
+  if (!horariosBase.length) {
+    const [y,m,d] = date.split("-").map(Number);
+    const diaSemana = new Date(y, m - 1, d).getDay();
+    if (diaSemana >= 1 && diaSemana <= 6) {
+      horariosBase = HORARIOS_PADRAO.map(horario => ({ horario, disponivel: true }));
+    }
+  }
+
+  const ocupados = new Set((agendados || []).map(item => String(item.horario).slice(0,5)));
+  const disponiveis = horariosBase
+    .filter(item => item.disponivel !== false)
+    .filter(item => !ocupados.has(String(item.horario).slice(0,5)));
 
   if (!disponiveis.length) {
     select.innerHTML = `<option value="">Nenhum horário disponível nesta data</option>`;
@@ -1041,32 +1055,86 @@ window.adminAdicionarLinhaHorario = function () {
 window.adminSalvarHorariosEditados = async function () {
   const data = document.getElementById("adminDataHorario")?.value;
   if (!data) return alert("Escolha a data.");
-  const rows = [...document.querySelectorAll("#adminHorariosLote .adminHorarioEditarHora")];
-  const checks = [...document.querySelectorAll("#adminHorariosLote .adminHorarioEditarDisponivel")];
-  if (!rows.length) return alert("Adicione pelo menos um horário.");
+
+  const rowEls = [...document.querySelectorAll("#adminHorariosLote > div > div")];
+  if (!rowEls.length) return alert("Adicione pelo menos um horário.");
 
   const client = adminClient();
   try {
-    for (let i = 0; i < rows.length; i++) {
-      const horario = rows[i].value;
-      const disponivel = !!checks[i]?.checked;
-      const id = checks[i]?.dataset.id;
+    // Primeiro lemos os registros atuais para conseguir sincronizar a data inteira.
+    const { data: atuais, error: leituraError } = await client
+      .from("horarios")
+      .select("id,horario,disponivel")
+      .eq("data", data);
+    if (leituraError) throw leituraError;
+
+    const idsMantidos = new Set();
+    const horariosSelecionados = new Set();
+
+    for (const row of rowEls) {
+      const inputHora = row.querySelector(".adminHorarioEditarHora");
+      const check = row.querySelector(".adminHorarioEditarDisponivel");
+      const horario = inputHora?.value;
       if (!horario) continue;
 
-      let result;
-      if (id) {
-        result = await client.from("horarios").update({ horario, disponivel }).eq("id", id);
-      } else {
-        result = await client.from("horarios").upsert({ data, horario, disponivel }, { onConflict: "data,horario" });
+      if (horariosSelecionados.has(horario)) {
+        return alert("Existe horário repetido neste dia. Confira os horários e tente novamente.");
       }
-      if (result.error) throw result.error;
+      horariosSelecionados.add(horario);
+
+      const id = check?.dataset.id ? Number(check.dataset.id) : null;
+      const disponivel = !!check?.checked;
+
+      if (id) {
+        const { error } = await client
+          .from("horarios")
+          .update({ horario, disponivel })
+          .eq("id", id)
+          .eq("data", data);
+        if (error) throw error;
+        idsMantidos.add(id);
+      } else {
+        const { data: inserido, error } = await client
+          .from("horarios")
+          .upsert({ data, horario, disponivel }, { onConflict: "data,horario" })
+          .select("id")
+          .single();
+        if (error) throw error;
+        if (inserido?.id) idsMantidos.add(Number(inserido.id));
+      }
     }
+
+    // Linhas que foram removidas do editor deixam de existir para aquela data.
+    // Só removemos horários que não estão ocupados por um agendamento ativo.
+    const idsParaExcluir = (atuais || [])
+      .filter(r => !idsMantidos.has(Number(r.id)))
+      .map(r => Number(r.id));
+
+    if (idsParaExcluir.length) {
+      const { data: ocupados, error: ocupadosError } = await client
+        .from("agendamentos")
+        .select("horario")
+        .eq("data", data)
+        .in("status", ["confirmado", "agendado", "pendente"]);
+      if (ocupadosError) throw ocupadosError;
+
+      const ocupadosSet = new Set((ocupados || []).map(a => String(a.horario).slice(0,5)));
+      const idsExcluiveis = (atuais || [])
+        .filter(r => idsParaExcluir.includes(Number(r.id)) && !ocupadosSet.has(String(r.horario).slice(0,5)))
+        .map(r => Number(r.id));
+
+      if (idsExcluiveis.length) {
+        const { error } = await client.from("horarios").delete().in("id", idsExcluiveis);
+        if (error) throw error;
+      }
+    }
+
     alert("Horários do dia salvos com sucesso! 💗");
     await renderAdminHorarios();
   } catch (error) {
     console.error(error);
     if (error?.code === "23505") return alert("Existe horário repetido neste dia. Confira os horários e tente novamente.");
-    alert("Não foi possível salvar os horários deste dia.");
+    alert("Não foi possível salvar os horários deste dia.\n\n" + (error?.message || "Verifique sua conexão com o Supabase."));
   }
 };
 
