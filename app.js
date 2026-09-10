@@ -382,6 +382,14 @@ async function openBooking(index = null) {
       <p id="bookingTrocoResultado" class="muted"></p>
     </div>
 
+    <div id="bookingPayLaterBox" style="display:none;">
+      <label>
+        Pagar até
+        <input id="bookingPayLaterDate" type="date" min="${hoje}">
+      </label>
+      <p class="muted" style="margin-top:4px;">Escolha a data limite para realizar o pagamento deste atendimento.</p>
+    </div>
+
     <p id="bookingPaymentStatus" class="muted"></p>
 
     <button class="primary full" onclick="confirmarAgendamento()">
@@ -412,8 +420,10 @@ async function atualizarOpcaoPagarDepoisAgendamento() {
 function atualizarPagamentoAgendamento() {
   const payment = document.getElementById("bookingPayment")?.value;
   const cashBox = document.getElementById("bookingCashBox");
+  const payLaterBox = document.getElementById("bookingPayLaterBox");
   const status = document.getElementById("bookingPaymentStatus");
   if (cashBox) cashBox.style.display = payment === "dinheiro" ? "block" : "none";
+  if (payLaterBox) payLaterBox.style.display = payment === "pagar_depois" ? "block" : "none";
   if (status) status.textContent = payment === "pagar_depois" ? "Este atendimento ficará registrado como valor a receber." : "";
   if (payment !== "dinheiro") {
     const input = document.getElementById("bookingTrocoPara");
@@ -442,6 +452,7 @@ async function confirmarAgendamento() {
   const date = document.getElementById("bookingDate")?.value;
   const time = document.getElementById("bookingTime")?.value;
   const payment = document.getElementById("bookingPayment")?.value;
+  const pagarAte = document.getElementById("bookingPayLaterDate")?.value || null;
   const trocoPara = Number(document.getElementById("bookingTrocoPara")?.value || 0);
 
   if (!service || !date || !time) {
@@ -450,6 +461,10 @@ async function confirmarAgendamento() {
   }
   if (!payment) {
     alert("Escolha a forma de pagamento.");
+    return;
+  }
+  if (payment === "pagar_depois" && !pagarAte) {
+    alert("Escolha até que data o pagamento será realizado.");
     return;
   }
 
@@ -486,6 +501,7 @@ async function confirmarAgendamento() {
       horario: time,
       status: "confirmado",
       forma_pagamento: payment,
+      data_vencimento: payment === "pagar_depois" ? pagarAte : null,
       troco_para: payment === "dinheiro" && trocoPara ? trocoPara : null,
       troco: payment === "dinheiro" && trocoPara ? troco : null,
       pagamento_status: payment === "pagar_depois" ? "pendente" : "pendente"
@@ -507,7 +523,7 @@ async function confirmarAgendamento() {
   }
 
   closeModal();
-  alert(`Agendamento realizado com sucesso! 💗\n\n${service}\n${date.split("-").reverse().join("/")}\n${time}`);
+  alert(`Agendamento realizado com sucesso! 💗\n\n${service}\n${date.split("-").reverse().join("/")}\n${time}${payment === "pagar_depois" ? `\nPagar até: ${pagarAte.split("-").reverse().join("/")}` : ""}`);
 }
 
 function abrirWhatsAppAgendamento() {
@@ -1495,13 +1511,14 @@ async function renderAdminAgendamentos() {
       const nome = a.cliente_nome || "Cliente";
       const whatsapp = a.cliente_whatsapp || "";
       const trocoInfo = a.forma_pagamento === "dinheiro" && a.troco_para != null ? `<br>Troco para: ${money(Number(a.troco_para))}${a.troco != null ? ` — Troco: ${money(Number(a.troco))}` : ""}` : "";
+      const vencimentoInfo = a.forma_pagamento === "pagar_depois" ? `<br>Pagar até: ${a.data_vencimento ? finDate(a.data_vencimento) : "A combinar"}` : "";
       const podeFechar = !["cancelado","faltou","realizado"].includes(String(a.status || "").toLowerCase());
       return `<div style="padding:14px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
         <strong>📅 ${escapeHtml(String(a.data || ""))} — ${escapeHtml(String(a.horario || "").slice(0,5))}</strong>
         <div style="margin-top:6px;">💅 ${escapeHtml(a.servico || "Serviço não informado")}</div>
         <div>👤 ${escapeHtml(nome)}${whatsapp ? ` — ${escapeHtml(whatsapp)}` : ""}</div>
         <div>Status: <strong>${escapeHtml(statusLabel(a.status))}</strong></div>
-        <div>Pagamento: ${escapeHtml(pagamento)} — ${escapeHtml(a.pagamento_status || "pendente")}${trocoInfo}</div>
+        <div>Pagamento: ${escapeHtml(pagamento)} — ${escapeHtml(a.pagamento_status || "pendente")}${trocoInfo}${vencimentoInfo}</div>
         ${podeFechar ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
           <button class="primary small" onclick="adminMarcarAgendamento(${Number(a.id)},'realizado')">✅ Realizado</button>
           <button class="secondary small" onclick="adminMarcarAgendamento(${Number(a.id)},'faltou')">⚠️ Faltou</button>
@@ -1547,7 +1564,7 @@ window.adminNovoAgendamento = async function (clienteSelecionadoId = null) {
         <label>Horário<input id="adminAgHora" type="time" style="width:100%;padding:10px;"></label>
       </div>
       <label style="display:block;margin:10px 0;">Forma de pagamento
-        <select id="adminAgPagamento" style="width:100%;padding:10px;">
+        <select id="adminAgPagamento" style="width:100%;padding:10px;" onchange="adminAtualizarPagarDepois()">
           <option value="pix">Pix</option>
           <option value="dinheiro">Dinheiro</option>
           <option value="debito">Cartão de débito</option>
@@ -1555,6 +1572,11 @@ window.adminNovoAgendamento = async function (clienteSelecionadoId = null) {
           <option value="pagar_depois">Pagar depois</option>
         </select>
       </label>
+      <div id="adminAgPagarAteBox" style="display:none;">
+        <label style="display:block;margin:10px 0;">Pagar até
+          <input id="adminAgPagarAte" type="date" min="${hoje}" style="width:100%;padding:10px;">
+        </label>
+      </div>
       <button class="primary full" onclick="adminSalvarNovoAgendamento()">Agendar</button>
       <button class="secondary full" onclick="closeModal()">Voltar</button>
     `);
@@ -1596,14 +1618,24 @@ window.adminSalvarNovoCadastro = async function () {
   await adminNovoAgendamento(novoId);
 };
 
+window.adminAtualizarPagarDepois = function () {
+  const pagamento = document.getElementById("adminAgPagamento")?.value;
+  const box = document.getElementById("adminAgPagarAteBox");
+  if (box) box.style.display = pagamento === "pagar_depois" ? "block" : "none";
+};
+
 window.adminSalvarNovoAgendamento = async function () {
   const clienteId = Number(document.getElementById("adminAgCliente")?.value);
   const servico = document.getElementById("adminAgServico")?.value;
   const data = document.getElementById("adminAgData")?.value;
   const horario = document.getElementById("adminAgHora")?.value;
   const pagamento = document.getElementById("adminAgPagamento")?.value;
+  const pagarAte = document.getElementById("adminAgPagarAte")?.value || null;
   if (!clienteId || !servico || !data || !horario || !pagamento) {
     return alert("Preencha cliente, serviço, data, horário e forma de pagamento.");
+  }
+  if (pagamento === "pagar_depois" && !pagarAte) {
+    return alert("Escolha até que data o pagamento será realizado.");
   }
   const client = adminClient();
   const { error } = await client.rpc("admin_criar_agendamento_manual", {
@@ -1611,7 +1643,8 @@ window.adminSalvarNovoAgendamento = async function () {
     p_servico: servico,
     p_data: data,
     p_horario: horario,
-    p_forma_pagamento: pagamento
+    p_forma_pagamento: pagamento,
+    p_data_vencimento: pagarAte
   });
   if (error) {
     console.error(error);
@@ -1638,7 +1671,7 @@ window.adminMarcarAgendamento = async function(id, status) {
   });
   if (error) { console.error(error); return alert("Não foi possível atualizar o agendamento."); }
   if (status === "realizado") {
-    const { data: a } = await client.from("agendamentos").select("id,cliente_id,servico,data,forma_pagamento,pagamento_status").eq("id", id).single();
+    const { data: a } = await client.from("agendamentos").select("id,cliente_id,servico,data,forma_pagamento,pagamento_status,data_vencimento").eq("id", id).single();
     if (a && a.forma_pagamento !== "pagar_depois") {
       await client.from("entradas_financeiro").upsert({
         agendamento_id:a.id, cliente_id:a.cliente_id, servico:a.servico, data:a.data, valor:precoAtualServico(a.servico), forma_pagamento:a.forma_pagamento, desconto:0, status:"pago"
@@ -1646,7 +1679,7 @@ window.adminMarcarAgendamento = async function(id, status) {
       await client.from("agendamentos").update({pagamento_status:"pago"}).eq("id", id);
     } else if (a) {
       const valor = precoAtualServico(a.servico);
-      await client.from("contas_receber").upsert({agendamento_id:a.id, cliente_id:a.cliente_id, valor_original:valor, valor_pago:0, saldo:valor, data_vencimento:null, status:"pendente"}, {onConflict:"agendamento_id"});
+      await client.from("contas_receber").upsert({agendamento_id:a.id, cliente_id:a.cliente_id, valor_original:valor, valor_pago:0, saldo:valor, data_vencimento:a.data_vencimento || null, status:"pendente"}, {onConflict:"agendamento_id"});
     }
   }
   renderAdminAgendamentos();
