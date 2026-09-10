@@ -1734,9 +1734,44 @@ async function finMostrarFechamento(){
 
 window.finAlternarFechamento=async function(){ const d=new Date(); const mes=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`; const client=adminClient(); const {data}=await client.from('fechamentos_financeiros').select('*').eq('mes',mes).maybeSingle(); const fechado=!data?.fechado; const {error}=await client.from('fechamentos_financeiros').upsert({mes,fechado,fechado_em:fechado?new Date().toISOString():null},{onConflict:'mes'}); if(error){console.error(error);return alert('Não foi possível atualizar o fechamento.');} finMostrarFechamento(); };
 
-async function finMostrarHistorico(){ const box=document.getElementById('financeiroConteudo'); if(!box)return; const client=adminClient(); const [e,d,est]=await Promise.all([client.from('entradas_financeiro').select('*').order('data',{ascending:false}).order('id',{ascending:false}),client.from('despesas_financeiro').select('*').order('data',{ascending:false}).order('id',{ascending:false}),client.from('estornos_financeiros').select('*').order('data',{ascending:false}).order('id',{ascending:false})]); const rows=[...(e.data||[]).map(x=>({data:x.data,tipo:'Entrada',desc:x.servico||x.cliente_nome||'Entrada',valor:Number(x.valor)})),...(d.data||[]).map(x=>({data:x.data,tipo:'Despesa',desc:x.descricao||x.categoria,valor:-Number(x.valor)})),...(est.data||[]).map(x=>({data:x.data,tipo:'Estorno',desc:x.motivo||'Estorno',valor:-Number(x.valor)}))].sort((a,b)=>String(b.data).localeCompare(String(a.data))); box.innerHTML=`<h4>📚 Histórico financeiro</h4><button class="secondary small" onclick="finExportarCSV()">⬇️ Exportar CSV</button><div style="margin-top:10px;">${rows.map(x=>`<div style="padding:10px;border-bottom:1px solid #eee;"><strong>${finDate(x.data)}</strong> · ${escapeHtml(x.tipo)} · ${escapeHtml(x.desc)} · <strong>${finMoney(x.valor)}</strong></div>`).join('')||'<p>Nenhum lançamento.</p>'}</div>`; }
+async function finMostrarHistorico(){ const box=document.getElementById('financeiroConteudo'); if(!box)return; const client=adminClient(); const [e,d,est]=await Promise.all([client.from('entradas_financeiro').select('*').order('data',{ascending:false}).order('id',{ascending:false}),client.from('despesas_financeiro').select('*').order('data',{ascending:false}).order('id',{ascending:false}),client.from('estornos_financeiros').select('*').order('data',{ascending:false}).order('id',{ascending:false})]); const rows=[...(e.data||[]).map(x=>({data:x.data,tipo:'Entrada',desc:x.servico||x.cliente_nome||'Entrada',valor:Number(x.valor)})),...(d.data||[]).map(x=>({data:x.data,tipo:'Despesa',desc:x.descricao||x.categoria,valor:-Number(x.valor)})),...(est.data||[]).map(x=>({data:x.data,tipo:'Estorno',desc:x.motivo||'Estorno',valor:-Number(x.valor)}))].sort((a,b)=>String(b.data).localeCompare(String(a.data))); box.innerHTML=`<h4>📚 Histórico financeiro</h4><button class="secondary small" onclick="finExportarCSV()">⬇️ Exportar CSV</button><button class="primary small" onclick="finFazerBackupCompleto()">🔐 Backup completo</button><div style="margin-top:10px;">${rows.map(x=>`<div style="padding:10px;border-bottom:1px solid #eee;"><strong>${finDate(x.data)}</strong> · ${escapeHtml(x.tipo)} · ${escapeHtml(x.desc)} · <strong>${finMoney(x.valor)}</strong></div>`).join('')||'<p>Nenhum lançamento.</p>'}</div>`; }
 
 window.finExportarCSV=async function(){ const client=adminClient(); const [e,d]=await Promise.all([client.from('entradas_financeiro').select('*').order('data'),client.from('despesas_financeiro').select('*').order('data')]); const rows=[['Data','Tipo','Descrição','Valor','Forma de pagamento'],...(e.data||[]).map(x=>[x.data,'Entrada',x.servico||x.cliente_nome||'',x.valor,x.forma_pagamento||'']),...(d.data||[]).map(x=>[x.data,'Despesa',x.descricao||x.categoria||'',-Number(x.valor), ''])]; const csv=rows.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';')).join('\n'); const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8;'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`financeiro-debora-nail-${finToday()}.csv`; a.click(); URL.revokeObjectURL(a.href); };
+
+window.finFazerBackupCompleto=async function(){
+  if(!confirm('Fazer um backup completo dos dados do site agora? O arquivo será salvo no seu celular/computador e não altera nada no site.')) return;
+  const client=adminClient();
+  const tabelas=['Clientes','agendamentos','vip_fidelidade','horarios','servicos','galeria','promocoes','avisos_novidades','entradas_financeiro','despesas_financeiro','contas_receber','pagamentos_receber','estornos_financeiros','metas_financeiras','fechamentos_financeiros'];
+  try{
+    const resultados=await Promise.all(tabelas.map(async tabela=>{
+      const {data,error}=await client.from(tabela).select('*');
+      if(error) throw new Error(`${tabela}: ${error.message}`);
+      return [tabela,data||[]];
+    }));
+    const backup={
+      produto:'Debora Nail',
+      tipo:'backup_completo_dados',
+      versao:1,
+      gerado_em:new Date().toISOString(),
+      observacao:'Backup dos dados acessíveis pelo painel administrativo. Não inclui senhas nem dados internos de autenticação.',
+      tabelas:Object.fromEntries(resultados)
+    };
+    const json=JSON.stringify(backup,null,2);
+    const blob=new Blob([json],{type:'application/json;charset=utf-8'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;
+    a.download=`backup-debora-nail-${finToday()}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    alert('Backup completo criado com sucesso! 💗\n\nGuarde esse arquivo em um lugar seguro.');
+  }catch(error){
+    console.error(error);
+    alert('Não foi possível criar o backup completo.\n\n'+(error?.message||'Verifique sua conexão e tente novamente.'));
+  }
+};
 
 window.finRegistrarEstorno=async function(entradaId){ const valor=Number((prompt('Valor do estorno:')||'').replace(',','.')); if(!Number.isFinite(valor)||valor<=0)return alert('Valor inválido.'); const motivo=prompt('Motivo do estorno:')||''; const client=adminClient(); const {data:e}=await client.from('entradas_financeiro').select('*').eq('id',entradaId).single(); if(!e)return alert('Entrada não encontrada.'); const {error}=await client.from('estornos_financeiros').insert({entrada_id:entradaId,cliente_id:e.cliente_id,data:finToday(),valor,motivo}); if(error){console.error(error);return alert('Não foi possível registrar o estorno.');} alert('Estorno registrado no histórico.'); };
 
