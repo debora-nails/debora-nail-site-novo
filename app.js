@@ -921,7 +921,6 @@ window.adminAlterarHorario = async function (id, disponivel) {
 async function renderAdminHorarios() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
-
   conteudo.innerHTML = `<h3>📅 Horários</h3>
     <p>Cadastre os horários que ficarão disponíveis para suas clientes.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
@@ -930,45 +929,14 @@ async function renderAdminHorarios() {
       <button class="primary small" onclick="adminAdicionarHorario()">Adicionar</button>
     </div>
     <div id="listaHorariosAdmin" style="margin-top:18px">Carregando...</div>`;
-
   const client = adminClient();
-
-  const { data: horarios, error } = await client
-    .from("horarios")
-    .select("id,data,horario,disponivel")
-    .order("data")
-    .order("horario");
-
-  if (error) {
-    document.getElementById("listaHorariosAdmin").textContent = "Não foi possível carregar os horários.";
-    return;
-  }
-
-  const { data: agendados } = await client
-    .from("agendamentos")
-    .select("data,horario,status")
-    .in("status", ["confirmado", "agendado", "pendente"]);
-
-  const ocupados = new Set(
-    (agendados || []).map(a => `${a.data}|${String(a.horario).slice(0, 5)}`)
-  );
-
-  document.getElementById("listaHorariosAdmin").innerHTML =
-    (horarios || []).map(r => {
-      const chave = `${r.data}|${String(r.horario).slice(0, 5)}`;
-      const ocupado = ocupados.has(chave);
-
-      return `
-        <div style="display:flex;justify-content:space-between;gap:10px;padding:10px;border-bottom:1px solid #eee;">
-          <span>
-            ${r.data} — ${String(r.horario).slice(0,5)} —
-            ${ocupado ? "Ocupado — cliente agendada" : (r.disponivel ? "Disponível" : "Indisponível")}
-          </span>
-          <button class="primary small" onclick="adminAlterarHorario(${r.id}, ${r.disponivel})">
-            ${r.disponivel ? "Bloquear" : "Liberar"}
-          </button>
-        </div>`;
-    }).join("") || "Nenhum horário cadastrado ainda.";
+  const { data, error } = await client.from("horarios").select("id,data,horario,disponivel").order("data").order("horario");
+  if (error) { document.getElementById("listaHorariosAdmin").textContent = "Não foi possível carregar os horários."; return; }
+  document.getElementById("listaHorariosAdmin").innerHTML = (data || []).map(r => `
+    <div style="display:flex;justify-content:space-between;gap:10px;padding:10px;border-bottom:1px solid #eee;">
+      <span>${r.data} — ${String(r.horario).slice(0,5)} — ${r.disponivel ? "Disponível" : "Indisponível"}</span>
+      <button class="primary small" onclick="adminAlterarHorario(${r.id}, ${r.disponivel})">${r.disponivel ? "Bloquear" : "Liberar"}</button>
+    </div>`).join("") || "Nenhum horário cadastrado ainda.";
 }
 
 window.adminAdicionarFoto = async function () {
@@ -1106,6 +1074,16 @@ async function carregarPromocoesPublicas() {
       const fimOk = !p.data_fim || p.data_fim >= hoje;
       return inicioOk && fimOk && p.servico && p.preco_promocional != null;
     });
+
+    // Atualiza o contador de promoções no painel VIP.
+    document.querySelectorAll(".vip-stat").forEach(card => {
+      const titulo = card.querySelector(":scope > span");
+      const valor = card.querySelector(":scope > strong");
+      if (titulo && valor && titulo.textContent.trim().toLowerCase() === "promoções") {
+        valor.textContent = String(PROMOCOES_ATIVAS.length);
+      }
+    });
+
     renderServices();
   } catch (e) {
     console.warn("Erro ao carregar promoções públicas.", e);
