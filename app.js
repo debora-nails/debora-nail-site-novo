@@ -1289,10 +1289,22 @@ window.adminAdicionarAviso = async function () {
   if (!titulo || !mensagem) return alert("Preencha o título e a mensagem do aviso.");
 
   const client = adminClient();
+  const { data: ultimaOrdem, error: erroOrdem } = await client
+    .from("avisos_novidades")
+    .select("ordem")
+    .order("ordem", { ascending: false })
+    .limit(1);
+  if (erroOrdem) {
+    console.error(erroOrdem);
+    return alert("Não foi possível verificar a ordem dos avisos.");
+  }
+
+  const proximaOrdem = Number(ultimaOrdem?.[0]?.ordem || 0) + 1;
   const { error } = await client.from("avisos_novidades").insert({
     titulo,
     mensagem,
-    ativo: true
+    ativo: true,
+    ordem: proximaOrdem
   });
 
   if (error) {
@@ -1322,6 +1334,24 @@ window.adminExcluirAviso = async function (id) {
   carregarAvisosPublicos();
 };
 
+window.adminMudarOrdemAviso = async function (id, novaOrdem) {
+  const ordem = Number(novaOrdem);
+  if (!Number.isInteger(ordem) || ordem < 1) return;
+  const client = adminClient();
+  const { error } = await client.rpc("admin_reordenar_aviso", {
+    p_id: Number(id),
+    p_nova_ordem: ordem
+  });
+  if (error) {
+    console.error(error);
+    alert("Não foi possível alterar a ordem do aviso.");
+    renderAdminAvisos();
+    return;
+  }
+  renderAdminAvisos();
+  carregarAvisosPublicos();
+};
+
 async function renderAdminAvisos() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
@@ -1341,7 +1371,8 @@ async function renderAdminAvisos() {
   const client = adminClient();
   const { data, error } = await client
     .from("avisos_novidades")
-    .select("id,titulo,mensagem,ativo,created_at")
+    .select("id,titulo,mensagem,ativo,created_at,ordem")
+    .order("ordem", { ascending: true })
     .order("id", { ascending: false });
 
   if (error) {
@@ -1350,9 +1381,18 @@ async function renderAdminAvisos() {
     return;
   }
 
+  const totalAvisos = (data || []).length;
   document.getElementById("listaAvisosAdmin").innerHTML = (data || []).map(a => `
     <div style="padding:14px;border:1px solid #ead7df;border-radius:14px;margin-bottom:10px;">
-      <strong>${escapeHtml(a.titulo)}</strong>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+        <strong>${escapeHtml(a.titulo)}</strong>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:14px;">
+          Ordem:
+          <select onchange="adminMudarOrdemAviso(${a.id}, this.value)" style="padding:6px 8px;border-radius:8px;">
+            ${Array.from({length: totalAvisos}, (_, i) => { const pos = i + 1; return `<option value="${pos}" ${Number(a.ordem) === pos ? "selected" : ""}>${pos}º</option>`; }).join("")}
+          </select>
+        </label>
+      </div>
       <p style="white-space:pre-wrap;">${escapeHtml(a.mensagem)}</p>
       <small>Status: ${a.ativo ? "Ativo" : "Inativo"}</small>
       <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
@@ -2135,8 +2175,9 @@ async function carregarAvisosPublicos() {
     const client = adminClient();
     const { data, error } = await client
       .from("avisos_novidades")
-      .select("id,titulo,mensagem,ativo")
+      .select("id,titulo,mensagem,ativo,ordem")
       .eq("ativo", true)
+      .order("ordem", { ascending: true })
       .order("id", { ascending: false });
     if (error) {
       console.warn("Não foi possível carregar avisos e novidades.", error);
