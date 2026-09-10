@@ -2153,12 +2153,14 @@ function abrirAvisosNovidades() {
   showModal(`
     <h2>Avisos e novidades 📢</h2>
     <p class="muted">Fique por dentro das novidades da Débora Nail.</p>
-    ${avisos.length ? avisos.map(a => `
-      <article style="padding:14px;border:1px solid #ead7df;border-radius:14px;margin-bottom:10px;">
-        <h3>${escapeHtml(a.titulo)}</h3>
-        <p style="white-space:pre-wrap;">${escapeHtml(a.mensagem)}</p>
-      </article>
-    `).join("") : `<p>No momento não há avisos ou novidades publicados.</p>`}
+    <div style="max-height:60vh;overflow-y:auto;padding-right:6px;-webkit-overflow-scrolling:touch;">
+      ${avisos.length ? avisos.map(a => `
+        <article style="padding:14px;border:1px solid #ead7df;border-radius:14px;margin-bottom:10px;">
+          <h3>${escapeHtml(a.titulo)}</h3>
+          <p style="white-space:pre-wrap;">${escapeHtml(a.mensagem)}</p>
+        </article>
+      `).join("") : `<p>No momento não há avisos ou novidades publicados.</p>`}
+    </div>
     <button class="primary full" onclick="closeModal()">Fechar</button>
   `);
 }
