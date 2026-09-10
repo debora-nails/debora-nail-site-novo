@@ -1157,6 +1157,7 @@ async function renderAdminClientes() {
           </label>
         </div>
         <small style="display:block;margin-top:6px;color:#777;">${c.permite_pagamento_posterior ? "Cliente autorizada a pagar depois." : "Pagamento depois desativado."}</small>
+        <button class="secondary small" style="margin-top:10px;" onclick="adminVerHistoricoCliente(${Number(c.id)})">📋 Ver histórico</button>
       </div>
     `).join("");
   } catch (error) {
@@ -1179,6 +1180,67 @@ window.adminSalvarPontos = async function (clienteId, vipId) {
   if (error) return alert("Não foi possível salvar os pontos.");
   alert("Pontos atualizados! ⭐");
   renderAdminVip();
+};
+
+window.adminVerHistoricoCliente = async function (clienteId) {
+  const id = Number(clienteId);
+  if (!Number.isFinite(id)) return;
+
+  try {
+    const client = adminClient();
+
+    const [clienteResult, agendamentosResult] = await Promise.all([
+      client.from("Clientes").select("id,nome").eq("id", id).maybeSingle(),
+      client.rpc("admin_listar_agendamentos")
+    ]);
+
+    if (agendamentosResult.error) throw agendamentosResult.error;
+
+    const cliente = clienteResult.data || { nome: "Cliente" };
+    const todos = Array.isArray(agendamentosResult.data)
+      ? agendamentosResult.data
+      : (Array.isArray(agendamentosResult.data?.agendamentos) ? agendamentosResult.data.agendamentos : []);
+
+    const historico = todos
+      .filter(a => Number(a.cliente_id) === id && String(a.status || "").toLowerCase() === "realizado")
+      .sort((a, b) => {
+        const da = `${a.data || ""} ${a.horario || ""}`;
+        const db = `${b.data || ""} ${b.horario || ""}`;
+        return db.localeCompare(da);
+      });
+
+    const formatDate = value => value ? String(value).split("-").reverse().join("/") : "Data não informada";
+    const total = historico.length;
+
+    const lista = historico.length
+      ? historico.map((a, index) => `
+          <div style="padding:12px 0;border-bottom:1px solid #ead7df;">
+            <strong>💅 Atendimento ${total - index}</strong>
+            <div style="margin-top:4px;">📅 ${escapeHtml(formatDate(a.data))}${a.horario ? ` às ${escapeHtml(String(a.horario).slice(0,5))}` : ""}</div>
+            <div style="margin-top:3px;">✨ ${escapeHtml(a.servico || "Serviço não informado")}</div>
+          </div>
+        `).join("")
+      : `<div style="padding:18px;border:1px solid #ead7df;border-radius:14px;background:#fff7fb;text-align:center;">
+           Ainda não há atendimentos <strong>Realizados</strong> para esta cliente. 💗
+         </div>`;
+
+    showModal(`
+      <h2>📋 Histórico de ${escapeHtml(cliente.nome || "Cliente")}</h2>
+      <p class="muted">Somente atendimentos marcados como <strong>Realizado</strong> entram neste histórico.</p>
+      <div style="padding:14px;border-radius:14px;background:#fff7fb;margin:14px 0;">
+        <strong>💅 Total de atendimentos realizados: ${total}</strong>
+      </div>
+      <div style="max-height:55vh;overflow:auto;">${lista}</div>
+      <button class="primary full" style="margin-top:14px;" onclick="closeModal()">Fechar</button>
+    `);
+  } catch (error) {
+    console.error("Erro ao carregar histórico da cliente:", error);
+    showModal(`
+      <h2>📋 Histórico da cliente</h2>
+      <p>Não foi possível carregar o histórico agora.</p>
+      <button class="primary full" onclick="closeModal()">Fechar</button>
+    `);
+  }
 };
 
 window.adminAlternarPagamentoPosterior = async function (clienteId, permitido) {
@@ -1735,70 +1797,6 @@ function configurarDetalhesVIP() {
     if (!alvo) return;
 
     const texto = (alvo.textContent || "").replace(/\s+/g, " ").trim().toLowerCase();
-
-    // No cartão "SEU NÍVEL", o botão "VER BENEFÍCIOS" não deve abrir
-    // o cartão de 10 pontos. Ele mostra os benefícios do nível atual.
-    const cardNivel = alvo.closest(".vip-stat");
-    const tituloCardNivel = cardNivel?.querySelector(":scope > span")?.textContent?.trim().toLowerCase();
-    const botaoBeneficiosNivel = alvo.closest("button")?.textContent?.trim().toLowerCase();
-
-    if (cardNivel && tituloCardNivel === "seu nível" && botaoBeneficiosNivel?.includes("ver benefício")) {
-      event.preventDefault();
-      event.stopPropagation();
-
-      const client = adminClient();
-      client.auth.getSession().then(async ({ data }) => {
-        if (!data?.session?.user) {
-          openVipModal();
-          return;
-        }
-
-        const { data: c } = await client
-          .from("Clientes")
-          .select("id,nome")
-          .eq("user_id", data.session.user.id)
-          .maybeSingle();
-
-        if (!c) return;
-
-        const { count } = await client
-          .from("agendamentos")
-          .select("id", { count: "exact", head: true })
-          .eq("cliente_id", c.id)
-          .eq("status", "realizado");
-
-        const total = Math.max(0, Number(count || 0));
-        const nivel = total <= 5
-          ? "BRONZE"
-          : total <= 10
-            ? "PRATA"
-            : total <= 20
-              ? "OURO"
-              : "DIAMANTE";
-
-        const beneficios = {
-          BRONZE: "💗 Você está começando sua jornada VIP com a Débora. Continue realizando seus procedimentos para avançar para o nível Prata!",
-          PRATA: "✨ Você já conquistou o nível Prata! Continue cuidando das suas unhas com a Débora para chegar ao Ouro.",
-          OURO: "👑 Você alcançou o nível Ouro! Continue realizando seus procedimentos para chegar ao Diamante.",
-          DIAMANTE: "💎 Você alcançou o nível Diamante, o nível máximo! Continue aproveitando sua experiência VIP com a Débora."
-        };
-
-        showModal(`
-          <div style="text-align:center;">
-            <div style="font-size:42px;margin-bottom:4px;">👑</div>
-            <h2>Benefícios do seu nível 💗</h2>
-            <p style="margin:8px 0 18px;">Olá, <strong>${c.nome || "Cliente VIP"}</strong>!</p>
-            <div style="font-size:24px;font-weight:800;">${nivel}</div>
-            <div style="padding:14px;border-radius:14px;background:#fff7fb;margin:18px 0;line-height:1.5;">
-              ${beneficios[nivel]}
-            </div>
-            <p style="font-size:13px;opacity:.75;line-height:1.5;">Seu nível é calculado pelos atendimentos que a Débora marcou como <strong>Realizado</strong>.</p>
-            <button class="primary full" onclick="closeModal()">Fechar</button>
-          </div>
-        `);
-      });
-      return;
-    }
 
     if (texto.includes("seu nível")) {
       event.preventDefault();
