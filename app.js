@@ -350,7 +350,7 @@ async function openBooking(index = null) {
 
     <label>
       Data
-      <input id="bookingDate" type="date" min="${hoje}" onchange="carregarHorariosDisponiveis()">
+      <input id="bookingDate" type="date" min="${hoje}" onchange="carregarHorariosDisponiveis(); atualizarOpcaoEncaixe()">
     </label>
 
     <label>
@@ -399,7 +399,11 @@ async function openBooking(index = null) {
     <button class="secondary full" onclick="abrirWhatsAppAgendamento()">
       CONTINUAR PELO WHATSAPP
     </button>
+    <div id="bookingEncaixeBox" style="display:none;margin-top:8px;">
+      <button class="secondary full" onclick="solicitarEncaixeWhatsApp()">💬 SOLICITAR ENCAIXE PELO WHATSAPP</button>
+    </div>
   `);
+  atualizarOpcaoEncaixe();
 
   await atualizarOpcaoPagarDepoisAgendamento();
   atualizarPagamentoAgendamento();
@@ -524,6 +528,24 @@ async function confirmarAgendamento() {
 
   closeModal();
   alert(`Agendamento realizado com sucesso! 💗\n\n${service}\n${date.split("-").reverse().join("/")}\n${time}${payment === "pagar_depois" ? `\nPagar até: ${pagarAte.split("-").reverse().join("/")}` : ""}`);
+}
+
+function atualizarOpcaoEncaixe() {
+  const date = document.getElementById("bookingDate")?.value;
+  const box = document.getElementById("bookingEncaixeBox");
+  if (!box) return;
+  if (!date) { box.style.display = "none"; return; }
+  const [y,m,d] = date.split("-").map(Number);
+  const diaSemana = new Date(y, m - 1, d).getDay();
+  box.style.display = (diaSemana === 5 || diaSemana === 6) ? "block" : "none";
+}
+
+function solicitarEncaixeWhatsApp() {
+  const service = document.getElementById("bookingService")?.value || "um atendimento";
+  const date = document.getElementById("bookingDate")?.value || "";
+  const dataFormatada = date ? date.split("-").reverse().join("/") : "";
+  const message = `Olá, Débora! 💗 Gostaria de solicitar um encaixe para ${service}${dataFormatada ? ` no dia ${dataFormatada}` : ""}. Se houver algum horário disponível, por favor me avise. 💅✨`;
+  window.open(`https://wa.me/5531972084333?text=${encodeURIComponent(message)}`, "_blank");
 }
 
 function abrirWhatsAppAgendamento() {
@@ -956,6 +978,98 @@ async function renderAdminPrecos() {
   }
 }
 
+const HORARIOS_PADRAO = ["07:00","09:00","11:00","13:30","15:00","16:30","17:30"];
+
+async function atualizarHorariosEmLote() {
+  const data = document.getElementById("adminDataHorario")?.value;
+  const box = document.getElementById("adminHorariosLote");
+  if (!box) return;
+  if (!data) {
+    box.innerHTML = `<small style="opacity:.7">Escolha uma data para editar os horários daquele dia.</small>`;
+    return;
+  }
+
+  const client = adminClient();
+  const { data: existentes, error } = await client
+    .from("horarios")
+    .select("id,data,horario,disponivel")
+    .eq("data", data)
+    .order("horario");
+
+  if (error) {
+    console.error(error);
+    box.innerHTML = `<small>Não foi possível carregar os horários desta data.</small>`;
+    return;
+  }
+
+  const linhas = (existentes && existentes.length)
+    ? existentes.map(r => ({ id:r.id, horario:String(r.horario).slice(0,5), disponivel:!!r.disponivel }))
+    : HORARIOS_PADRAO.map(h => ({ id:null, horario:h, disponivel:true }));
+
+  const [y,m,d] = data.split("-").map(Number);
+  const diaSemana = new Date(y, m - 1, d).getDay();
+  const nomes = ["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
+
+  box.innerHTML = `
+    <div style="margin-top:12px;padding:14px;border:1px solid #ead7df;border-radius:14px;background:#fff;">
+      <strong>Horários de ${nomes[diaSemana]} — ${d.toString().padStart(2,"0")}/${m.toString().padStart(2,"0")}/${y}</strong>
+      <p style="margin:5px 0 10px;opacity:.75">Os horários padrão já aparecem abaixo. Você pode editar o horário ou desmarcar para não disponibilizar naquele dia.</p>
+      <div style="display:grid;gap:8px;">
+        ${linhas.map((r,i) => `
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;">
+            <input type="checkbox" class="adminHorarioEditarDisponivel" data-id="${r.id ?? ''}" ${r.disponivel ? "checked" : ""}>
+            <input type="time" class="adminHorarioEditarHora" value="${r.horario}" min="00:00" max="23:59" style="max-width:125px;">
+            <span style="opacity:.7">${r.disponivel ? "Disponível" : "Indisponível"}</span>
+          </div>`).join("")}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
+        <button class="primary small" onclick="adminSalvarHorariosEditados()">💾 Salvar horários do dia</button>
+        <button class="secondary small" onclick="adminAdicionarLinhaHorario()">➕ Adicionar outro horário</button>
+      </div>
+    </div>`;
+}
+
+window.adminAdicionarLinhaHorario = function () {
+  const box = document.querySelector('#adminHorariosLote > div');
+  if (!box) return;
+  const row = document.createElement('div');
+  row.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;';
+  row.innerHTML = `<input type="checkbox" class="adminHorarioEditarDisponivel" checked><input type="time" class="adminHorarioEditarHora" value="18:00" min="00:00" max="23:59" style="max-width:125px;"><span style="opacity:.7">Disponível</span>`;
+  box.appendChild(row);
+};
+
+window.adminSalvarHorariosEditados = async function () {
+  const data = document.getElementById("adminDataHorario")?.value;
+  if (!data) return alert("Escolha a data.");
+  const rows = [...document.querySelectorAll("#adminHorariosLote .adminHorarioEditarHora")];
+  const checks = [...document.querySelectorAll("#adminHorariosLote .adminHorarioEditarDisponivel")];
+  if (!rows.length) return alert("Adicione pelo menos um horário.");
+
+  const client = adminClient();
+  try {
+    for (let i = 0; i < rows.length; i++) {
+      const horario = rows[i].value;
+      const disponivel = !!checks[i]?.checked;
+      const id = checks[i]?.dataset.id;
+      if (!horario) continue;
+
+      let result;
+      if (id) {
+        result = await client.from("horarios").update({ horario, disponivel }).eq("id", id);
+      } else {
+        result = await client.from("horarios").upsert({ data, horario, disponivel }, { onConflict: "data,horario" });
+      }
+      if (result.error) throw result.error;
+    }
+    alert("Horários do dia salvos com sucesso! 💗");
+    await renderAdminHorarios();
+  } catch (error) {
+    console.error(error);
+    if (error?.code === "23505") return alert("Existe horário repetido neste dia. Confira os horários e tente novamente.");
+    alert("Não foi possível salvar os horários deste dia.");
+  }
+};
+
 window.adminAdicionarHorario = async function () {
   const data = document.getElementById("adminDataHorario")?.value;
   const horario = document.getElementById("adminHoraHorario")?.value;
@@ -978,12 +1092,13 @@ async function renderAdminHorarios() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
   conteudo.innerHTML = `<h3>📅 Horários</h3>
-    <p>Cadastre os horários que ficarão disponíveis para suas clientes.</p>
+    <p>Escolha uma data. Os horários padrão aparecem automaticamente e você pode editar cada um antes de salvar.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
-      <label>Data<input id="adminDataHorario" type="date"></label>
-      <label>Horário<input id="adminHoraHorario" type="time" min="07:00" max="19:00"></label>
-      <button class="primary small" onclick="adminAdicionarHorario()">Adicionar</button>
+      <label>Data<input id="adminDataHorario" type="date" onchange="atualizarHorariosEmLote()"></label>
+      <label>Horário<input id="adminHoraHorario" type="time" min="00:00" max="23:59"></label>
+      <button class="secondary small" onclick="adminAdicionarHorario()">Adicionar horário avulso</button>
     </div>
+    <div id="adminHorariosLote"></div>
     <div id="listaHorariosAdmin" style="margin-top:18px">Carregando...</div>`;
   const client = adminClient();
   const { data, error } = await client.from("horarios").select("id,data,horario,disponivel").order("data").order("horario");
