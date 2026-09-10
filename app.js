@@ -690,6 +690,34 @@ async function carregarDadosVIP(cliente) {
     if (pointsText) pointsText.textContent = `${pontos} pts`;
   }
 
+  // O nível é calculado somente pelos atendimentos realmente realizados.
+  // Agendado, confirmado, cancelado ou falta não contam.
+  const { count: atendimentosRealizados, error: nivelError } = await client
+    .from("agendamentos")
+    .select("id", { count: "exact", head: true })
+    .eq("cliente_id", cliente.id)
+    .eq("status", "realizado");
+
+  if (nivelError) {
+    console.error("Erro ao calcular nível VIP:", nivelError);
+  }
+
+  const totalRealizados = Math.max(0, Number(atendimentosRealizados || 0));
+  const nivel = totalRealizados <= 5
+    ? { nome: "BRONZE", limite: 5 }
+    : totalRealizados <= 10
+      ? { nome: "PRATA", limite: 10 }
+      : totalRealizados <= 20
+        ? { nome: "OURO", limite: 20 }
+        : { nome: "DIAMANTE", limite: 30 };
+
+  if (vipStats[0]) {
+    const levelText = vipStats[0].querySelector("strong");
+    if (levelText) {
+      levelText.textContent = `${nivel.nome} • ${Math.min(totalRealizados, 30)}/${nivel.limite} unhas`;
+    }
+  }
+
   atualizarCartaoVIP(pontos, vip);
 }
 
@@ -1074,16 +1102,6 @@ async function carregarPromocoesPublicas() {
       const fimOk = !p.data_fim || p.data_fim >= hoje;
       return inicioOk && fimOk && p.servico && p.preco_promocional != null;
     });
-
-    // Atualiza o contador de promoções no painel VIP.
-    document.querySelectorAll(".vip-stat").forEach(card => {
-      const titulo = card.querySelector(":scope > span");
-      const valor = card.querySelector(":scope > strong");
-      if (titulo && valor && titulo.textContent.trim().toLowerCase() === "promoções") {
-        valor.textContent = String(PROMOCOES_ATIVAS.length);
-      }
-    });
-
     renderServices();
   } catch (e) {
     console.warn("Erro ao carregar promoções públicas.", e);
