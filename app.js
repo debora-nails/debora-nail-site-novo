@@ -1433,7 +1433,7 @@ Tempo: ${ag.ms} ms`);
 async function renderAdminAgendamentos() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
-  conteudo.innerHTML = `<h3>📋 Agendamentos</h3><p class="muted">Acompanhe os horários e registre o resultado de cada atendimento.</p><div id="listaAgendamentosAdmin">Carregando...</div>`;
+  conteudo.innerHTML = `<h3>📋 Agendamentos</h3><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 14px;"><p class="muted" style="margin:0;flex:1;min-width:220px;">Acompanhe os horários e registre o resultado de cada atendimento.</p><button class="primary small" onclick="adminNovoAgendamento()">➕ Novo agendamento</button></div><div id="listaAgendamentosAdmin">Carregando...</div>`;
   const lista = document.getElementById("listaAgendamentosAdmin");
   try {
     const client = adminClient();
@@ -1474,6 +1474,119 @@ async function renderAdminAgendamentos() {
     if (lista) lista.innerHTML = `<div style="padding:16px;border:1px solid #ead7df;border-radius:16px;background:#fff;"><strong>Não foi possível carregar os agendamentos.</strong><br><small>${escapeHtml(error?.message || "Erro desconhecido")}</small></div>`;
   }
 }
+
+
+window.adminNovoAgendamento = async function (clienteSelecionadoId = null) {
+  try {
+    const client = adminClient();
+    const { data, error } = await client.rpc("admin_listar_clientes");
+    if (error) throw error;
+    const clientes = Array.isArray(data) ? data : [];
+    const options = clientes.map(c =>
+      `<option value="${Number(c.id)}" ${Number(c.id) === Number(clienteSelecionadoId) ? "selected" : ""}>${escapeHtml(c.nome || "Cliente")}</option>`
+    ).join("");
+
+    const hoje = new Date().toISOString().split("T")[0];
+    showModal(`
+      <h2>➕ Novo agendamento</h2>
+      <p class="muted">Escolha uma cliente cadastrada. Se ela não estiver na lista, use <strong>Novo cadastro</strong>.</p>
+      <label style="display:block;margin:10px 0;">Cliente
+        <select id="adminAgCliente" style="width:100%;padding:10px;">
+          <option value="">Selecione a cliente</option>${options}
+        </select>
+      </label>
+      <button class="secondary full" onclick="adminNovoCadastroParaAgendamento()">➕ Novo cadastro</button>
+      <label style="display:block;margin:10px 0;">Serviço
+        <select id="adminAgServico" style="width:100%;padding:10px;">
+          <option value="">Selecione o serviço</option>
+          ${SERVICES.map(s => `<option value="${escapeHtml(s[0])}">${escapeHtml(s[0])} — ${money(precoAtualServico(s[0]))}</option>`).join("")}
+        </select>
+      </label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <label>Data<input id="adminAgData" type="date" min="${hoje}" style="width:100%;padding:10px;"></label>
+        <label>Horário<input id="adminAgHora" type="time" style="width:100%;padding:10px;"></label>
+      </div>
+      <label style="display:block;margin:10px 0;">Forma de pagamento
+        <select id="adminAgPagamento" style="width:100%;padding:10px;">
+          <option value="pix">Pix</option>
+          <option value="dinheiro">Dinheiro</option>
+          <option value="debito">Cartão de débito</option>
+          <option value="credito">Cartão de crédito</option>
+          <option value="pagar_depois">Pagar depois</option>
+        </select>
+      </label>
+      <button class="primary full" onclick="adminSalvarNovoAgendamento()">Agendar</button>
+      <button class="secondary full" onclick="closeModal()">Voltar</button>
+    `);
+  } catch (error) {
+    console.error(error);
+    alert("Não foi possível carregar as clientes.");
+  }
+};
+
+window.adminNovoCadastroParaAgendamento = function () {
+  showModal(`
+    <h2>👤 Novo cadastro</h2>
+    <p class="muted">O telefone e o e-mail são opcionais para clientes que não utilizam o site.</p>
+    <label style="display:block;margin:10px 0;">Nome *<input id="adminNovoNome" type="text" style="width:100%;padding:10px;"></label>
+    <label style="display:block;margin:10px 0;">WhatsApp (opcional)<input id="adminNovoWhatsApp" type="text" style="width:100%;padding:10px;"></label>
+    <label style="display:block;margin:10px 0;">E-mail (opcional)<input id="adminNovoEmail" type="email" style="width:100%;padding:10px;"></label>
+    <button class="primary full" onclick="adminSalvarNovoCadastro()">Salvar cliente e continuar</button>
+    <button class="secondary full" onclick="adminNovoAgendamento()">Voltar para clientes</button>
+  `);
+};
+
+window.adminSalvarNovoCadastro = async function () {
+  const nome = document.getElementById("adminNovoNome")?.value.trim();
+  const whatsapp = document.getElementById("adminNovoWhatsApp")?.value.trim() || null;
+  const email = document.getElementById("adminNovoEmail")?.value.trim() || null;
+  if (!nome) return alert("Digite o nome da cliente.");
+  const client = adminClient();
+  const { data, error } = await client.rpc("admin_criar_cliente_manual", {
+    p_nome: nome,
+    p_whatsapp: whatsapp,
+    p_email: email
+  });
+  if (error) {
+    console.error(error);
+    return alert("Não foi possível cadastrar a cliente.");
+  }
+  const novoId = Number(data?.id);
+  closeModal();
+  await adminNovoAgendamento(novoId);
+};
+
+window.adminSalvarNovoAgendamento = async function () {
+  const clienteId = Number(document.getElementById("adminAgCliente")?.value);
+  const servico = document.getElementById("adminAgServico")?.value;
+  const data = document.getElementById("adminAgData")?.value;
+  const horario = document.getElementById("adminAgHora")?.value;
+  const pagamento = document.getElementById("adminAgPagamento")?.value;
+  if (!clienteId || !servico || !data || !horario || !pagamento) {
+    return alert("Preencha cliente, serviço, data, horário e forma de pagamento.");
+  }
+  const client = adminClient();
+  const { error } = await client.rpc("admin_criar_agendamento_manual", {
+    p_cliente_id: clienteId,
+    p_servico: servico,
+    p_data: data,
+    p_horario: horario,
+    p_forma_pagamento: pagamento
+  });
+  if (error) {
+    console.error(error);
+    if (String(error.message || "").toLowerCase().includes("horário") || error.code === "23505") {
+      return alert("Esse horário não está disponível. Escolha outro horário.");
+    }
+    if (String(error.message || "").toLowerCase().includes("pagar depois")) {
+      return alert("O pagamento posterior não está liberado para esta cliente.");
+    }
+    return alert("Não foi possível realizar o agendamento.");
+  }
+  closeModal();
+  await renderAdminAgendamentos();
+  alert(`Agendamento realizado com sucesso! 💗\n\n${servico}\n${data.split("-").reverse().join("/")}\n${horario.slice(0,5)}`);
+};
 
 window.adminMarcarAgendamento = async function(id, status) {
   const nomes = {realizado:"concluir este atendimento como realizado", faltou:"marcar este atendimento como falta", cancelado:"cancelar este agendamento"};
