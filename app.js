@@ -356,7 +356,7 @@ async function openBooking(index = null) {
       <select id="bookingService">
         ${SERVICES.map((service, number) => `
           <option value="${service[0]}" ${number === index ? "selected" : ""}>
-            ${service[0]} — ${money(service[1])}
+            ${service[0]} — ${money(precoAtualServico(service[0]))}
           </option>
         `).join("")}
       </select>
@@ -2564,4 +2564,3 @@ configurarMeusDados();
 configurarMeusAgendamentosEAvisos();
 manterPontosVIPAtualizados();
 carregarAvisosPublicos();
-
