@@ -356,7 +356,7 @@ async function openBooking(index = null) {
       <select id="bookingService">
         ${SERVICES.map((service, number) => `
           <option value="${service[0]}" ${number === index ? "selected" : ""}>
-            ${service[0]} — ${money(precoAtualServico(service[0]))}
+            ${service[0]} — ${money(service[1])}
           </option>
         `).join("")}
       </select>
@@ -645,6 +645,7 @@ async function abrirRecuperacaoSenha() {
     <button class="secondary full" style="margin-top:8px;" onclick="openVipModal()">VOLTAR</button>
   `);
 }
+
 window.abrirRecuperacaoSenha = abrirRecuperacaoSenha;
 
 window.enviarRecuperacaoSenha = async function () {
@@ -670,7 +671,7 @@ window.enviarRecuperacaoSenha = async function () {
 
 if (window.supabase) {
   const recoveryClient = adminClient();
-  recoveryClient.auth.onAuthStateChange((event) => {
+  recoveryClient.auth.onAuthStateChange(async (event) => {
     if (event !== "PASSWORD_RECOVERY") return;
 
     showModal(`
@@ -713,7 +714,6 @@ window.salvarNovaSenha = async function () {
   alert("Senha alterada com sucesso! 💗 Agora você já pode entrar na sua Área VIP.");
   closeModal();
 };
-
 
 document
   .getElementById("modal")
@@ -1789,7 +1789,6 @@ async function renderAdminAgendamentos() {
           <button class="primary small" onclick="adminMarcarAgendamento(${Number(a.id)},'realizado')">✅ Realizado</button>
           <button class="secondary small" onclick="adminMarcarAgendamento(${Number(a.id)},'faltou')">⚠️ Faltou</button>
           <button class="secondary small" onclick="adminMarcarAgendamento(${Number(a.id)},'cancelado')">❌ Cancelar</button>
-          <button class="secondary small" onclick="adminReagendarAgendamento(${Number(a.id)})">🔄 Reagendar</button>
         </div>` : ""}
       </div>`;
     }).join("");
@@ -2462,9 +2461,6 @@ async function abrirMeusAgendamentos() {
             <div>📅 ${formatDate(a.data)}</div>
             <div>🕐 ${escapeHtml(a.horario)}</div>
             <div style="margin-top:5px;"><strong>Status: ${escapeHtml(statusLabel(a.status))}</strong></div>
-            ${["confirmado","agendado","pendente"].includes(String(a.status || "").toLowerCase()) && a.data >= new Date().toISOString().slice(0,10)
-              ? `<button class="secondary small" style="margin-top:10px;" onclick="abrirReagendamentoCliente(${Number(a.id)})">🔄 Reagendar</button>`
-              : ""}
           </div>
         `).join("")}
       </div>
@@ -2472,203 +2468,6 @@ async function abrirMeusAgendamentos() {
     <button class="primary full" style="margin-top:14px;" onclick="closeModal();openBooking()">Agendar novo horário</button>
   `);
 }
-
-async function carregarHorariosParaReagendamento(date, agendamentoId) {
-  const select = document.getElementById("reagendamentoHora");
-  const status = document.getElementById("reagendamentoStatus");
-  if (!select) return;
-
-  select.innerHTML = `<option value="">Carregando horários...</option>`;
-  select.disabled = true;
-  if (status) status.textContent = "";
-  if (!date) {
-    select.innerHTML = `<option value="">Selecione uma data primeiro</option>`;
-    return;
-  }
-
-  const client = adminClient();
-  const { data: horarios, error } = await client
-    .from("horarios")
-    .select("horario,disponivel")
-    .eq("data", date)
-    .order("horario");
-
-  if (error) {
-    console.error(error);
-    select.innerHTML = `<option value="">Não foi possível carregar os horários</option>`;
-    return;
-  }
-
-  const { data: agendados, error: agError } = await client
-    .from("agendamentos")
-    .select("id,horario")
-    .eq("data", date)
-    .in("status", ["confirmado", "agendado", "pendente"]);
-
-  if (agError) console.error(agError);
-
-  let horariosBase = horarios || [];
-  if (!horariosBase.length) {
-    const [y,m,d] = date.split("-").map(Number);
-    const diaSemana = new Date(y, m - 1, d).getDay();
-    if (diaSemana >= 1 && diaSemana <= 6) {
-      horariosBase = HORARIOS_PADRAO.map(horario => ({ horario, disponivel: true }));
-    }
-  }
-
-  const ocupados = new Set(
-    (agendados || [])
-      .filter(item => Number(item.id) !== Number(agendamentoId))
-      .map(item => String(item.horario).slice(0,5))
-  );
-
-  const disponiveis = horariosBase
-    .filter(item => item.disponivel !== false)
-    .filter(item => !ocupados.has(String(item.horario).slice(0,5)));
-
-  if (!disponiveis.length) {
-    select.innerHTML = `<option value="">Nenhum horário disponível nesta data</option>`;
-    if (status) status.textContent = "Escolha outra data.";
-    return;
-  }
-
-  select.disabled = false;
-  select.innerHTML =
-    `<option value="">Escolha um horário</option>` +
-    disponiveis.map(item => `<option value="${item.horario}">${String(item.horario).slice(0,5)}</option>`).join("");
-}
-
-window.abrirReagendamentoCliente = async function (id) {
-  const { user, cliente } = await getCurrentClient();
-  if (!user || !cliente) {
-    openVipModal();
-    return;
-  }
-
-  const client = adminClient();
-  const { data: agendamento, error } = await client
-    .from("agendamentos")
-    .select("id,cliente_id,servico,data,horario,status")
-    .eq("id", Number(id))
-    .eq("cliente_id", cliente.id)
-    .single();
-
-  if (error || !agendamento) {
-    return alert("Não foi possível localizar este agendamento.");
-  }
-
-  const status = String(agendamento.status || "").toLowerCase();
-  if (!["confirmado","agendado","pendente"].includes(status)) {
-    return alert("Este agendamento não pode mais ser reagendado.");
-  }
-
-  const hoje = new Date().toISOString().split("T")[0];
-  showModal(`
-    <h2>🔄 Reagendar horário</h2>
-    <p class="muted">Você está alterando o seu horário atual. O serviço permanece o mesmo.</p>
-    <p><strong>💅 ${escapeHtml(agendamento.servico)}</strong><br>Atual: ${escapeHtml(String(agendamento.data).split("-").reverse().join("/"))} às ${escapeHtml(String(agendamento.horario).slice(0,5))}</p>
-    <label>
-      Nova data
-      <input id="reagendamentoData" type="date" min="${hoje}" value="${escapeHtml(String(agendamento.data || hoje))}" onchange="carregarHorariosParaReagendamento(this.value, ${Number(agendamento.id)})">
-    </label>
-    <label>
-      Novo horário
-      <select id="reagendamentoHora" disabled>
-        <option value="">Carregando horários...</option>
-      </select>
-    </label>
-    <p id="reagendamentoStatus" class="muted"></p>
-    <button class="primary full" onclick="confirmarReagendamentoCliente(${Number(agendamento.id)})">CONFIRMAR REAGENDAMENTO</button>
-    <button class="secondary full" style="margin-top:8px;" onclick="abrirMeusAgendamentos()">Voltar</button>
-  `);
-
-  await carregarHorariosParaReagendamento(agendamento.data, agendamento.id);
-};
-
-window.confirmarReagendamentoCliente = async function (id) {
-  const date = document.getElementById("reagendamentoData")?.value;
-  const time = document.getElementById("reagendamentoHora")?.value;
-  if (!date || !time) return alert("Escolha a nova data e o novo horário.");
-
-  const { cliente } = await getCurrentClient();
-  if (!cliente) return alert("Entre na sua Área VIP para reagendar.");
-
-  const client = adminClient();
-  const { error } = await client.rpc("cliente_reagendar_agendamento", {
-    p_agendamento_id: Number(id),
-    p_nova_data: date,
-    p_novo_horario: time
-  });
-
-  if (error) {
-    console.error(error);
-    return alert(error.message || "Não foi possível reagendar este horário.");
-  }
-
-  closeModal();
-  await abrirMeusAgendamentos();
-  alert(`Agendamento reagendado com sucesso! 💗\n\nNova data: ${date.split("-").reverse().join("/")}\nNovo horário: ${String(time).slice(0,5)}`);
-};
-
-window.adminReagendarAgendamento = async function (id) {
-  const client = adminClient();
-  const { data: agendamento, error } = await client
-    .from("agendamentos")
-    .select("id,cliente_id,servico,data,horario,status,cliente_nome,cliente_whatsapp")
-    .eq("id", Number(id))
-    .single();
-
-  if (error || !agendamento) return alert("Não foi possível localizar este agendamento.");
-
-  const status = String(agendamento.status || "").toLowerCase();
-  if (!["confirmado","agendado","pendente"].includes(status)) {
-    return alert("Este agendamento não pode mais ser reagendado.");
-  }
-
-  const hoje = new Date().toISOString().split("T")[0];
-  showModal(`
-    <h2>🔄 Reagendar agendamento</h2>
-    <p class="muted"><strong>${escapeHtml(agendamento.cliente_nome || "Cliente")}</strong> — o serviço permanece o mesmo.</p>
-    <p><strong>💅 ${escapeHtml(agendamento.servico)}</strong><br>Atual: ${escapeHtml(String(agendamento.data).split("-").reverse().join("/"))} às ${escapeHtml(String(agendamento.horario).slice(0,5))}</p>
-    <label>
-      Nova data
-      <input id="reagendamentoData" type="date" min="${hoje}" value="${escapeHtml(String(agendamento.data || hoje))}" onchange="carregarHorariosParaReagendamento(this.value, ${Number(agendamento.id)})">
-    </label>
-    <label>
-      Novo horário
-      <select id="reagendamentoHora" disabled>
-        <option value="">Carregando horários...</option>
-      </select>
-    </label>
-    <p id="reagendamentoStatus" class="muted"></p>
-    <button class="primary full" onclick="confirmarReagendamentoAdmin(${Number(agendamento.id)})">CONFIRMAR REAGENDAMENTO</button>
-    <button class="secondary full" style="margin-top:8px;" onclick="renderAdminAgendamentos()">Voltar</button>
-  `);
-
-  await carregarHorariosParaReagendamento(agendamento.data, agendamento.id);
-};
-
-window.confirmarReagendamentoAdmin = async function (id) {
-  const date = document.getElementById("reagendamentoData")?.value;
-  const time = document.getElementById("reagendamentoHora")?.value;
-  if (!date || !time) return alert("Escolha a nova data e o novo horário.");
-
-  const client = adminClient();
-  const { error } = await client.rpc("admin_reagendar_agendamento", {
-    p_agendamento_id: Number(id),
-    p_nova_data: date,
-    p_novo_horario: time
-  });
-
-  if (error) {
-    console.error(error);
-    return alert(error.message || "Não foi possível reagendar este horário.");
-  }
-
-  closeModal();
-  await renderAdminAgendamentos();
-  alert(`Agendamento reagendado com sucesso! 💗\n\nNova data: ${date.split("-").reverse().join("/")}\nNovo horário: ${String(time).slice(0,5)}`);
-};
 
 async function carregarAvisosPublicos() {
   try {
@@ -2848,3 +2647,4 @@ configurarMeusDados();
 configurarMeusAgendamentosEAvisos();
 manterPontosVIPAtualizados();
 carregarAvisosPublicos();
+
