@@ -1669,6 +1669,29 @@ Tempo: ${ag.ms} ms`);
   }
 }
 
+function adminAgendamentosOcultosKey() {
+  return "debora_nail_agendamentos_cancelados_ocultos_v1";
+}
+
+function adminLerAgendamentosOcultos() {
+  try {
+    const dados = JSON.parse(localStorage.getItem(adminAgendamentosOcultosKey()) || "[]");
+    return new Set(Array.isArray(dados) ? dados.map(Number).filter(Number.isFinite) : []);
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function adminOcultarAgendamentoCancelado(id) {
+  const numero = Number(id);
+  if (!Number.isFinite(numero)) return;
+  if (!confirm("Tirar este agendamento cancelado da lista?\n\nEle NÃO será apagado do histórico da cliente nem do banco de dados.")) return;
+  const ocultos = adminLerAgendamentosOcultos();
+  ocultos.add(numero);
+  localStorage.setItem(adminAgendamentosOcultosKey(), JSON.stringify([...ocultos]));
+  renderAdminAgendamentos();
+}
+
 async function renderAdminAgendamentos() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
@@ -1682,10 +1705,18 @@ async function renderAdminAgendamentos() {
     const { data, error } = await Promise.race([rpc, timeout]);
     clearTimeout(timer);
     if (error) throw error;
-    let agendamentos = Array.isArray(data) ? data : (Array.isArray(data?.agendamentos) ? data.agendamentos : []);
 
-    // Organiza os agendamentos sempre em ordem cronológica: data mais próxima primeiro
-    // e, no mesmo dia, horário mais cedo primeiro.
+    let agendamentos = Array.isArray(data) ? data : (Array.isArray(data?.agendamentos) ? data.agendamentos : []);
+    const ocultos = adminLerAgendamentosOcultos();
+
+    // Cancelados que você já tirou da lista continuam no banco e no histórico,
+    // mas não aparecem novamente nesta tela administrativa.
+    agendamentos = agendamentos.filter(a => !(
+      String(a.status || "").toLowerCase() === "cancelado" && ocultos.has(Number(a.id))
+    ));
+
+    // Organiza da data mais próxima para a mais distante.
+    // No mesmo dia, o horário mais cedo aparece primeiro.
     agendamentos = [...agendamentos].sort((a, b) => {
       const dataHoraA = `${String(a.data || "")}T${String(a.horario || "").slice(0,5)}`;
       const dataHoraB = `${String(b.data || "")}T${String(b.horario || "").slice(0,5)}`;
@@ -1693,47 +1724,81 @@ async function renderAdminAgendamentos() {
     });
 
     const diasSemana = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+    const meses = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
     const diaSemanaLabel = value => {
       if (!value) return "";
       const partes = String(value).split("-").map(Number);
       if (partes.length !== 3 || partes.some(n => !Number.isFinite(n))) return "";
-      const dia = new Date(partes[0], partes[1] - 1, partes[2]).getDay();
-      return diasSemana[dia] || "";
+      return diasSemana[new Date(partes[0], partes[1] - 1, partes[2]).getDay()] || "";
     };
     const dataLabel = value => value ? String(value).split("-").reverse().join("/") : "";
+    const mesAnoKey = value => {
+      const partes = String(value || "").split("-").map(Number);
+      return partes.length === 3 && partes.every(Number.isFinite) ? `${partes[0]}-${String(partes[1]).padStart(2,"0")}` : "sem-data";
+    };
+    const mesAnoLabel = value => {
+      const partes = String(value || "").split("-").map(Number);
+      if (partes.length !== 3 || partes.some(n => !Number.isFinite(n))) return "Agendamentos sem data";
+      return `📅 AGENDAMENTOS DE ${meses[partes[1] - 1].toUpperCase()} DE ${partes[0]}`;
+    };
     const pagamentos = { pix:"Pix", dinheiro:"Dinheiro", debito:"Cartão de débito", credito:"Cartão de crédito", pagar_depois:"Pagar depois" };
     const statusLabel = s => ({ confirmado:"Confirmado", agendado:"Agendado", realizado:"Realizado", cancelado:"Cancelado", faltou:"Faltou" }[String(s || "").toLowerCase()] || s || "Agendado");
+
     if (!agendamentos.length) {
       lista.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;">Nenhum agendamento cadastrado ainda. 💗</div>`;
       return;
     }
-    lista.innerHTML = agendamentos.map(a => {
-      const pagamento = pagamentos[a.forma_pagamento] || "Não informado";
-      const nome = a.cliente_nome || "Cliente";
-      const whatsapp = a.cliente_whatsapp || "";
-      const trocoInfo = a.forma_pagamento === "dinheiro" && a.troco_para != null ? `<br>Troco para: ${money(Number(a.troco_para))}${a.troco != null ? ` — Troco: ${money(Number(a.troco))}` : ""}` : "";
-      const vencimentoInfo = a.forma_pagamento === "pagar_depois" ? `<br>Pagar até: ${a.data_vencimento ? finDate(a.data_vencimento) : "A combinar"}` : "";
-      const podeFechar = !["cancelado","faltou","realizado"].includes(String(a.status || "").toLowerCase());
-      return `<div style="padding:14px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
-        <strong>📅 ${escapeHtml(dataLabel(a.data))} — ${escapeHtml(diaSemanaLabel(a.data))} — ${escapeHtml(String(a.horario || "").slice(0,5))}</strong>
-        <div style="margin-top:6px;">💅 ${escapeHtml(a.servico || "Serviço não informado")}</div>
-        <div>👤 ${escapeHtml(nome)}${whatsapp ? ` — ${escapeHtml(whatsapp)}` : ""}</div>
-        <div>Status: <strong>${escapeHtml(statusLabel(a.status))}</strong></div>
-        <div>Pagamento: ${escapeHtml(pagamento)} — ${escapeHtml(a.pagamento_status || "pendente")}${trocoInfo}${vencimentoInfo}</div>
-        ${podeFechar ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
-          <button class="primary small" onclick="adminReagendarAgendamento(${Number(a.id)})">🔄 Reagendar</button>
-          <button class="primary small" onclick="adminMarcarAgendamento(${Number(a.id)},'realizado')">✅ Realizado</button>
-          <button class="secondary small" onclick="adminMarcarAgendamento(${Number(a.id)},'faltou')">⚠️ Faltou</button>
-          <button class="secondary small" onclick="adminMarcarAgendamento(${Number(a.id)},'cancelado')">❌ Cancelar</button>
-        </div>` : ""}
-      </div>`;
-    }).join("");
+
+    const grupos = [];
+    const mapa = new Map();
+    agendamentos.forEach(a => {
+      const chave = mesAnoKey(a.data);
+      if (!mapa.has(chave)) {
+        const grupo = { chave, dataReferencia: a.data, itens: [] };
+        mapa.set(chave, grupo);
+        grupos.push(grupo);
+      }
+      mapa.get(chave).itens.push(a);
+    });
+
+    lista.innerHTML = grupos.map(grupo => `
+      <section style="margin:18px 0 24px;">
+        <div style="padding:12px 14px;border-radius:14px;background:#f8edf3;border:1px solid #ead7df;margin-bottom:10px;">
+          <strong style="font-size:17px;">${escapeHtml(mesAnoLabel(grupo.dataReferencia))}</strong>
+        </div>
+        ${grupo.itens.map(a => {
+          const pagamento = pagamentos[a.forma_pagamento] || "Não informado";
+          const nome = a.cliente_nome || "Cliente";
+          const whatsapp = a.cliente_whatsapp || "";
+          const trocoInfo = a.forma_pagamento === "dinheiro" && a.troco_para != null ? `<br>Troco para: ${money(Number(a.troco_para))}${a.troco != null ? ` — Troco: ${money(Number(a.troco))}` : ""}` : "";
+          const vencimentoInfo = a.forma_pagamento === "pagar_depois" ? `<br>Pagar até: ${a.data_vencimento ? finDate(a.data_vencimento) : "A combinar"}` : "";
+          const status = String(a.status || "").toLowerCase();
+          const podeFechar = !["cancelado","faltou","realizado"].includes(status);
+          const cancelado = status === "cancelado";
+          return `<div style="padding:14px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
+            <strong>📅 ${escapeHtml(dataLabel(a.data))} — ${escapeHtml(diaSemanaLabel(a.data))} — ${escapeHtml(String(a.horario || "").slice(0,5))}</strong>
+            <div style="margin-top:6px;">💅 ${escapeHtml(a.servico || "Serviço não informado")}</div>
+            <div>👤 ${escapeHtml(nome)}${whatsapp ? ` — ${escapeHtml(whatsapp)}` : ""}</div>
+            <div>Status: <strong>${escapeHtml(statusLabel(a.status))}</strong></div>
+            <div>Pagamento: ${escapeHtml(pagamento)} — ${escapeHtml(a.pagamento_status || "pendente")}${trocoInfo}${vencimentoInfo}</div>
+            ${cancelado ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
+              <button class="secondary small" onclick="adminOcultarAgendamentoCancelado(${Number(a.id)})">✖ Tirar da lista</button>
+            </div>` : ""}
+            ${podeFechar ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
+              <button class="primary small" onclick="adminReagendarAgendamento(${Number(a.id)})">🔄 Reagendar</button>
+              <button class="primary small" onclick="adminMarcarAgendamento(${Number(a.id)},'realizado')">✅ Realizado</button>
+              <button class="secondary small" onclick="adminMarcarAgendamento(${Number(a.id)},'faltou')">⚠️ Faltou</button>
+              <button class="secondary small" onclick="adminMarcarAgendamento(${Number(a.id)},'cancelado')">❌ Cancelar</button>
+            </div>` : ""}
+          </div>`;
+        }).join("")}
+      </section>
+    `).join("");
   } catch (error) {
     console.error("Erro ao carregar agendamentos:", error);
     if (lista) lista.innerHTML = `<div style="padding:16px;border:1px solid #ead7df;border-radius:16px;background:#fff;"><strong>Não foi possível carregar os agendamentos.</strong><br><small>${escapeHtml(error?.message || "Erro desconhecido")}</small></div>`;
   }
 }
-
 
 window.adminNovoAgendamento = async function (clienteSelecionadoId = null) {
   try {
