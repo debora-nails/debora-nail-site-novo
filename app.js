@@ -1669,10 +1669,156 @@ Tempo: ${ag.ms} ms`);
   }
 }
 
-async function renderAdminAgendamentos() {
+async 
+/* ===== REAGENDAMENTO — única alteração desta versão ===== */
+async function carregarHorariosParaReagendamento(data, agendamentoId) {
+  const { data: rows, error } = await adminClient()
+    .from("horarios").select("*").eq("data", data).order("horario");
+  if (error) throw error;
+
+  let horarios = (rows || [])
+    .filter(r => r.disponivel !== false)
+    .map(r => String(r.horario).slice(0, 5));
+
+  if (!horarios.length) {
+    const d = new Date(data + "T12:00:00");
+    const dia = d.getDay();
+    if (dia >= 1 && dia <= 6) horarios = [...HORARIOS_PADRAO];
+  }
+
+  const { data: ocupados, error: e2 } = await adminClient()
+    .from("agendamentos")
+    .select("id, horario")
+    .eq("data", data)
+    .in("status", ["confirmado", "agendado", "pendente"]);
+  if (e2) throw e2;
+
+  const ocupadosSet = new Set(
+    (ocupados || [])
+      .filter(a => String(a.id) !== String(agendamentoId))
+      .map(a => String(a.horario).slice(0, 5))
+  );
+
+  return horarios.filter(h => !ocupadosSet.has(h));
+}
+
+async function abrirReagendamentoCliente(id) {
+  const { data: ag, error } = await adminClient()
+    .from("agendamentos").select("*").eq("id", id).single();
+  if (error) return alert("Não foi possível carregar o agendamento.");
+
+  const dataAtual = String(ag.data || "").slice(0, 10);
+  showModal(`
+    <h2>🔄 Reagendar</h2>
+    <p class="muted">Escolha uma nova data e horário.</p>
+    <label>Nova data
+      <input id="reagendarData" type="date" min="${dataAtual}" value="${dataAtual}">
+    </label>
+    <label>Novo horário
+      <select id="reagendarHorario"><option>Carregando...</option></select>
+    </label>
+    <button class="primary full" onclick="confirmarReagendamentoCliente(${Number(id)})">CONFIRMAR REAGENDAMENTO</button>
+  `);
+
+  const campo = document.getElementById("reagendarData");
+  const carregar = async () => {
+    try {
+      const hs = await carregarHorariosParaReagendamento(campo.value, id);
+      document.getElementById("reagendarHorario").innerHTML = hs.length
+        ? hs.map(h => `<option value="${h}">${h}</option>`).join("")
+        : `<option value="">Nenhum horário disponível</option>`;
+    } catch (e) {
+      console.error(e);
+      document.getElementById("reagendarHorario").innerHTML =
+        `<option value="">Erro ao carregar horários</option>`;
+    }
+  };
+  campo.addEventListener("change", carregar);
+  await carregar();
+}
+
+async function confirmarReagendamentoCliente(id) {
+  const data = document.getElementById("reagendarData")?.value;
+  const horario = document.getElementById("reagendarHorario")?.value;
+  if (!data || !horario) return alert("Escolha uma data e um horário.");
+
+  const { error } = await adminClient().rpc("cliente_reagendar_agendamento", {
+    p_agendamento_id: Number(id),
+    p_nova_data: data,
+    p_novo_horario: horario
+  });
+  if (error) {
+    console.error(error);
+    return alert(error.message || "Não foi possível reagendar.");
+  }
+
+  closeModal();
+  alert("Agendamento reagendado com sucesso! 💗");
+  if (typeof window.abrirMeusAgendamentos === "function") {
+    window.abrirMeusAgendamentos();
+  }
+}
+
+async function adminReagendarAgendamento(id) {
+  const { data: ag, error } = await adminClient()
+    .from("agendamentos").select("*").eq("id", id).single();
+  if (error) return alert("Não foi possível carregar o agendamento.");
+
+  const dataAtual = String(ag.data || "").slice(0, 10);
+  showModal(`
+    <h2>🔄 Reagendar agendamento</h2>
+    <p class="muted">${ag.servico || ""}</p>
+    <label>Nova data
+      <input id="adminReagendarData" type="date" min="${dataAtual}" value="${dataAtual}">
+    </label>
+    <label>Novo horário
+      <select id="adminReagendarHorario"><option>Carregando...</option></select>
+    </label>
+    <button class="primary full" onclick="confirmarReagendamentoAdmin(${Number(id)})">CONFIRMAR REAGENDAMENTO</button>
+  `);
+
+  const campo = document.getElementById("adminReagendarData");
+  const carregar = async () => {
+    try {
+      const hs = await carregarHorariosParaReagendamento(campo.value, id);
+      document.getElementById("adminReagendarHorario").innerHTML = hs.length
+        ? hs.map(h => `<option value="${h}">${h}</option>`).join("")
+        : `<option value="">Nenhum horário disponível</option>`;
+    } catch (e) {
+      console.error(e);
+      document.getElementById("adminReagendarHorario").innerHTML =
+        `<option value="">Erro ao carregar horários</option>`;
+    }
+  };
+  campo.addEventListener("change", carregar);
+  await carregar();
+}
+
+async function confirmarReagendamentoAdmin(id) {
+  const data = document.getElementById("adminReagendarData")?.value;
+  const horario = document.getElementById("adminReagendarHorario")?.value;
+  if (!data || !horario) return alert("Escolha uma data e um horário.");
+
+  const { error } = await adminClient().rpc("admin_reagendar_agendamento", {
+    p_agendamento_id: Number(id),
+    p_nova_data: data,
+    p_novo_horario: horario
+  });
+  if (error) {
+    console.error(error);
+    return alert(error.message || "Não foi possível reagendar.");
+  }
+
+  closeModal();
+  alert("Agendamento reagendado com sucesso! 💗");
+  if (typeof renderAdminAgendamentos === "function") renderAdminAgendamentos();
+}
+/* ===== FIM REAGENDAMENTO ===== */
+
+function renderAdminAgendamentos() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
-  conteudo.innerHTML = `<h3>📋 Agendamentos</h3><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 14px;"><p class="muted" style="margin:0;flex:1;min-width:220px;">Acompanhe os horários e registre o resultado de cada atendimento.</p><button class="primary small" onclick="adminNovoAgendamento()">➕ Novo agendamento</button></div><div id="listaAgendamentosAdmin">Carregando...</div>`;
+  conteudo.innerHTML = `<h3>📋 Agendamentos</h3><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0 14px;"><p class="muted" style="margin:0;flex:1;min-width:220px;">Acompanhe os horários e registre o resultado de cada atendimento.</p><button class="primary small" onclick="adminNovoAgendamento()">➕ Novo agendamento</button> <button class="secondary small" onclick="adminReagendarAgendamento(${Number(a.id)})">🔄 Reagendar</button></div><div id="listaAgendamentosAdmin">Carregando...</div>`;
   const lista = document.getElementById("listaAgendamentosAdmin");
   try {
     const client = adminClient();
@@ -2353,7 +2499,7 @@ async function abrirMeusAgendamentos() {
     return showModal(`
       <h2>Meus agendamentos 💗</h2>
       <p>Não foi possível carregar seus agendamentos agora. Tente novamente.</p>
-      <button class="primary full" onclick="closeModal()">Fechar</button>
+      <button class="primary full" onclick="closeModal()">Fechar</button> <button class="secondary small" onclick="abrirReagendamentoCliente(${Number(ag.id)})">🔄 Reagendar</button>
     `);
   }
 
