@@ -356,7 +356,7 @@ async function openBooking(index = null) {
       <select id="bookingService">
         ${SERVICES.map((service, number) => `
           <option value="${service[0]}" ${number === index ? "selected" : ""}>
-            ${service[0]} — ${money(precoAtualServico(service[0]))}
+            ${service[0]} — ${money(service[1])}
           </option>
         `).join("")}
       </select>
@@ -601,6 +601,7 @@ function openVipModal() {
     </label>
 
     <button class="primary full" onclick="vipLogin()">ENTRAR NA ÁREA VIP</button>
+    <button class="secondary full" style="margin-top:8px;" onclick="abrirRecuperacaoSenha()">Esqueci minha senha</button>
 
     <hr>
 
@@ -631,6 +632,88 @@ function openVipModal() {
 
 window.openVipModal = openVipModal;
 
+async function abrirRecuperacaoSenha() {
+  const email = document.getElementById("vipEmail")?.value.trim() || "";
+  showModal(`
+    <h2>Recuperar senha</h2>
+    <p class="muted">Digite o e-mail usado no seu cadastro VIP. Você receberá um link para criar uma nova senha.</p>
+    <label>
+      E-mail
+      <input id="vipRecoveryEmail" type="email" placeholder="Seu e-mail" autocomplete="email" value="${email.replace(/"/g, '&quot;')}">
+    </label>
+    <button class="primary full" onclick="enviarRecuperacaoSenha()">ENVIAR LINK</button>
+    <button class="secondary full" style="margin-top:8px;" onclick="openVipModal()">VOLTAR</button>
+  `);
+}
+
+window.abrirRecuperacaoSenha = abrirRecuperacaoSenha;
+
+window.enviarRecuperacaoSenha = async function () {
+  const email = document.getElementById("vipRecoveryEmail")?.value.trim();
+  if (!email) {
+    alert("Digite seu e-mail.");
+    return;
+  }
+
+  const client = adminClient();
+  const redirectTo = window.location.origin + window.location.pathname;
+  const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo });
+
+  if (error) {
+    console.error(error);
+    alert("Não foi possível enviar o link de recuperação. Tente novamente.");
+    return;
+  }
+
+  alert("Se este e-mail estiver cadastrado, você receberá um link para criar uma nova senha. 💗");
+  closeModal();
+};
+
+if (window.supabase) {
+  const recoveryClient = adminClient();
+  recoveryClient.auth.onAuthStateChange(async (event) => {
+    if (event !== "PASSWORD_RECOVERY") return;
+
+    showModal(`
+      <h2>Crie uma nova senha</h2>
+      <p class="muted">Digite sua nova senha para voltar a acessar sua Área VIP.</p>
+      <label>
+        Nova senha
+        <input id="vipNovaSenha" type="password" minlength="6" placeholder="Nova senha" autocomplete="new-password">
+      </label>
+      <label>
+        Confirmar nova senha
+        <input id="vipNovaSenhaConfirmacao" type="password" minlength="6" placeholder="Repita a nova senha" autocomplete="new-password">
+      </label>
+      <button class="primary full" onclick="salvarNovaSenha()">SALVAR NOVA SENHA</button>
+    `);
+  });
+}
+
+window.salvarNovaSenha = async function () {
+  const senha = document.getElementById("vipNovaSenha")?.value || "";
+  const confirmacao = document.getElementById("vipNovaSenhaConfirmacao")?.value || "";
+
+  if (senha.length < 6) {
+    alert("A senha precisa ter pelo menos 6 caracteres.");
+    return;
+  }
+  if (senha !== confirmacao) {
+    alert("As senhas não são iguais.");
+    return;
+  }
+
+  const client = adminClient();
+  const { error } = await client.auth.updateUser({ password: senha });
+  if (error) {
+    console.error(error);
+    alert("Não foi possível alterar a senha. Tente novamente.");
+    return;
+  }
+
+  alert("Senha alterada com sucesso! 💗 Agora você já pode entrar na sua Área VIP.");
+  closeModal();
+};
 
 document
   .getElementById("modal")
@@ -2564,3 +2647,4 @@ configurarMeusDados();
 configurarMeusAgendamentosEAvisos();
 manterPontosVIPAtualizados();
 carregarAvisosPublicos();
+
