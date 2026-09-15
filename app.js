@@ -602,6 +602,8 @@ function openVipModal() {
 
     <button class="primary full" onclick="vipLogin()">ENTRAR NA ÁREA VIP</button>
 
+    <button class="secondary full" style="margin-top:8px;" onclick="abrirRecuperacaoSenha()">🔑 ESQUECI MINHA SENHA</button>
+
     <hr>
 
     <h3>Criar minha conta VIP</h3>
@@ -631,6 +633,92 @@ function openVipModal() {
 
 window.openVipModal = openVipModal;
 
+/* ===== RECUPERAÇÃO DE SENHA VIP ===== */
+function abrirRecuperacaoSenha() {
+  const email = document.getElementById("vipEmail")?.value.trim() || "";
+
+  showModal(`
+    <h2>Recuperar senha 🔑</h2>
+    <p class="muted">Digite o e-mail usado no seu cadastro VIP. Você receberá um link para criar uma nova senha.</p>
+    <label>
+      E-mail
+      <input id="vipRecoveryEmail" type="email" placeholder="Seu e-mail" autocomplete="email" value="${escapeHtml(email)}">
+    </label>
+    <button class="primary full" onclick="enviarRecuperacaoSenha()">ENVIAR LINK DE RECUPERAÇÃO</button>
+    <button class="secondary full" style="margin-top:8px;" onclick="openVipModal()">VOLTAR</button>
+  `);
+}
+
+window.abrirRecuperacaoSenha = abrirRecuperacaoSenha;
+
+window.enviarRecuperacaoSenha = async function () {
+  const email = document.getElementById("vipRecoveryEmail")?.value.trim();
+
+  if (!email) {
+    alert("Informe seu e-mail.");
+    return;
+  }
+
+  const client = adminClient();
+  const redirectTo = window.location.origin + window.location.pathname;
+  const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo });
+
+  if (error) {
+    console.error("Erro ao enviar recuperação de senha:", error);
+    alert("Não foi possível enviar o link de recuperação. Tente novamente.");
+    return;
+  }
+
+  showModal(`
+    <h2>Confira seu e-mail 💗</h2>
+    <p>Se este e-mail estiver cadastrado, você receberá um link para criar uma nova senha.</p>
+    <p class="muted">Confira também a caixa de spam/lixo eletrônico.</p>
+    <button class="primary full" onclick="closeModal()">FECHAR</button>
+  `);
+};
+
+function abrirModalNovaSenha() {
+  showModal(`
+    <h2>Crie uma nova senha 🔐</h2>
+    <p class="muted">Escolha uma nova senha para acessar sua Área VIP.</p>
+    <label>
+      Nova senha
+      <input id="vipNovaSenha" type="password" minlength="6" placeholder="Mínimo de 6 caracteres" autocomplete="new-password">
+    </label>
+    <label>
+      Confirmar nova senha
+      <input id="vipNovaSenhaConfirmacao" type="password" minlength="6" placeholder="Digite novamente" autocomplete="new-password">
+    </label>
+    <button class="primary full" onclick="salvarNovaSenha()">SALVAR NOVA SENHA</button>
+  `);
+}
+
+window.salvarNovaSenha = async function () {
+  const senha = document.getElementById("vipNovaSenha")?.value || "";
+  const confirmacao = document.getElementById("vipNovaSenhaConfirmacao")?.value || "";
+
+  if (senha.length < 6) {
+    alert("A nova senha precisa ter pelo menos 6 caracteres.");
+    return;
+  }
+
+  if (senha !== confirmacao) {
+    alert("As senhas não são iguais.");
+    return;
+  }
+
+  const client = adminClient();
+  const { error } = await client.auth.updateUser({ password: senha });
+
+  if (error) {
+    console.error("Erro ao alterar senha:", error);
+    alert("Não foi possível alterar a senha. Tente novamente.");
+    return;
+  }
+
+  alert("Senha alterada com sucesso! 💗 Agora você já pode entrar na sua Área VIP.");
+  closeModal();
+};
 
 document
   .getElementById("modal")
@@ -877,6 +965,21 @@ function adminClient() {
     );
   }
   return __adminClientInstance;
+}
+
+/* O link de recuperação retorna ao mesmo site e dispara PASSWORD_RECOVERY.
+   Este listener é isolado para não interferir nos outros botões do site. */
+if (!window.__deboraRecoveryListenerAdded) {
+  window.__deboraRecoveryListenerAdded = true;
+  try {
+    adminClient().auth.onAuthStateChange(event => {
+      if (event === "PASSWORD_RECOVERY") {
+        abrirModalNovaSenha();
+      }
+    });
+  } catch (error) {
+    console.error("Não foi possível preparar a recuperação de senha:", error);
+  }
 }
 
 async function verificarAdmin() {
