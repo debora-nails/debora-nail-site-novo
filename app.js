@@ -1682,7 +1682,25 @@ async function renderAdminAgendamentos() {
     const { data, error } = await Promise.race([rpc, timeout]);
     clearTimeout(timer);
     if (error) throw error;
-    const agendamentos = Array.isArray(data) ? data : (Array.isArray(data?.agendamentos) ? data.agendamentos : []);
+    let agendamentos = Array.isArray(data) ? data : (Array.isArray(data?.agendamentos) ? data.agendamentos : []);
+
+    // Organiza os agendamentos sempre em ordem cronológica: data mais próxima primeiro
+    // e, no mesmo dia, horário mais cedo primeiro.
+    agendamentos = [...agendamentos].sort((a, b) => {
+      const dataHoraA = `${String(a.data || "")}T${String(a.horario || "").slice(0,5)}`;
+      const dataHoraB = `${String(b.data || "")}T${String(b.horario || "").slice(0,5)}`;
+      return dataHoraA.localeCompare(dataHoraB);
+    });
+
+    const diasSemana = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+    const diaSemanaLabel = value => {
+      if (!value) return "";
+      const partes = String(value).split("-").map(Number);
+      if (partes.length !== 3 || partes.some(n => !Number.isFinite(n))) return "";
+      const dia = new Date(partes[0], partes[1] - 1, partes[2]).getDay();
+      return diasSemana[dia] || "";
+    };
+    const dataLabel = value => value ? String(value).split("-").reverse().join("/") : "";
     const pagamentos = { pix:"Pix", dinheiro:"Dinheiro", debito:"Cartão de débito", credito:"Cartão de crédito", pagar_depois:"Pagar depois" };
     const statusLabel = s => ({ confirmado:"Confirmado", agendado:"Agendado", realizado:"Realizado", cancelado:"Cancelado", faltou:"Faltou" }[String(s || "").toLowerCase()] || s || "Agendado");
     if (!agendamentos.length) {
@@ -1697,7 +1715,7 @@ async function renderAdminAgendamentos() {
       const vencimentoInfo = a.forma_pagamento === "pagar_depois" ? `<br>Pagar até: ${a.data_vencimento ? finDate(a.data_vencimento) : "A combinar"}` : "";
       const podeFechar = !["cancelado","faltou","realizado"].includes(String(a.status || "").toLowerCase());
       return `<div style="padding:14px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
-        <strong>📅 ${escapeHtml(String(a.data || ""))} — ${escapeHtml(String(a.horario || "").slice(0,5))}</strong>
+        <strong>📅 ${escapeHtml(dataLabel(a.data))} — ${escapeHtml(diaSemanaLabel(a.data))} — ${escapeHtml(String(a.horario || "").slice(0,5))}</strong>
         <div style="margin-top:6px;">💅 ${escapeHtml(a.servico || "Serviço não informado")}</div>
         <div>👤 ${escapeHtml(nome)}${whatsapp ? ` — ${escapeHtml(whatsapp)}` : ""}</div>
         <div>Status: <strong>${escapeHtml(statusLabel(a.status))}</strong></div>
