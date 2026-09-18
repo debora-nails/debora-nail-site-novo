@@ -1896,6 +1896,7 @@ async function renderAdminAgendamentos() {
             </div>` : ""}
             ${podeFechar ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
               <button class="primary small" onclick="adminReagendarAgendamento(${Number(a.id)})">🔄 Reagendar</button>
+              <button class="secondary small" onclick="adminCorrigirProcedimento(${Number(a.id)})">✏️ Corrigir procedimento</button>
               <button class="primary small" onclick="adminMarcarAgendamento(${Number(a.id)},'realizado')">✅ Realizado</button>
               <button class="secondary small" onclick="adminMarcarAgendamento(${Number(a.id)},'faltou')">⚠️ Faltou</button>
               <button class="secondary small" onclick="adminMarcarAgendamento(${Number(a.id)},'cancelado')">❌ Cancelar</button>
@@ -2120,6 +2121,52 @@ window.adminSalvarReagendamento = async function(id) {
   closeModal();
   await renderAdminAgendamentos();
   alert(`Agendamento reagendado com sucesso! 💗\n\n${data.split("-").reverse().join("/")} às ${horario}`);
+};
+
+window.adminCorrigirProcedimento = async function(id) {
+  const client = adminClient();
+  const { data: agendamento, error } = await client
+    .from("agendamentos")
+    .select("id,cliente_id,servico,data,horario,status")
+    .eq("id", Number(id))
+    .maybeSingle();
+  if (error || !agendamento) {
+    console.error(error);
+    return alert("Não foi possível localizar este agendamento.");
+  }
+  const status = String(agendamento.status || "").toLowerCase();
+  if (!["confirmado","agendado","pendente"].includes(status)) {
+    return alert("Este agendamento não pode mais ter o procedimento corrigido.");
+  }
+  showModal(`
+    <h2>✏️ Corrigir procedimento</h2>
+    <p class="muted">Cliente: ${escapeHtml(agendamento.cliente_nome || "Cliente")}<br>Atual: <strong>${escapeHtml(agendamento.servico || "Serviço não informado")}</strong><br>${escapeHtml(agendamento.data ? String(agendamento.data).split("-").reverse().join("/") : "")} às ${escapeHtml(String(agendamento.horario || "").slice(0,5))}</p>
+    <label style="display:block;margin:10px 0;">Novo procedimento
+      <select id="adminCorrigirServico" style="width:100%;padding:10px;">
+        ${SERVICES.map(s => `<option value="${escapeHtml(s[0])}" ${String(s[0]) === String(agendamento.servico) ? "selected" : ""}>${escapeHtml(s[0])} — ${money(precoAtualServico(s[0]))}</option>`).join("")}
+      </select>
+    </label>
+    <button class="primary full" onclick="adminSalvarCorrecaoProcedimento(${Number(agendamento.id)})">SALVAR PROCEDIMENTO</button>
+    <button class="secondary full" onclick="closeModal()">Voltar</button>
+  `);
+};
+
+window.adminSalvarCorrecaoProcedimento = async function(id) {
+  const servico = document.getElementById("adminCorrigirServico")?.value;
+  if (!servico) return alert("Escolha o novo procedimento.");
+  if (!confirm(`Alterar o procedimento deste agendamento para ${servico}?`)) return;
+  const client = adminClient();
+  const { error } = await client
+    .from("agendamentos")
+    .update({ servico })
+    .eq("id", Number(id));
+  if (error) {
+    console.error(error);
+    return alert("Não foi possível corrigir o procedimento.");
+  }
+  closeModal();
+  await renderAdminAgendamentos();
+  alert(`Procedimento corrigido com sucesso! 💗\n\nNovo procedimento: ${servico}`);
 };
 
 window.adminMarcarAgendamento = async function(id, status) {
@@ -2656,13 +2703,68 @@ async function abrirMeusAgendamentos() {
             <div>📅 ${formatDate(a.data)}</div>
             <div>🕐 ${escapeHtml(a.horario)}</div>
             <div style="margin-top:5px;"><strong>Status: ${escapeHtml(statusLabel(a.status))}</strong></div>
-            ${["confirmado","agendado","pendente"].includes(String(a.status || "").toLowerCase()) ? `<button class="primary small full" style="margin-top:10px;" onclick="abrirReagendamentoCliente(${Number(a.id)})">🔄 Reagendar</button>` : ""}
+            ${["confirmado","agendado","pendente"].includes(String(a.status || "").toLowerCase()) ? `
+              <button class="primary small full" style="margin-top:10px;" onclick="abrirReagendamentoCliente(${Number(a.id)})">🔄 Reagendar</button>
+              <button class="secondary small full" style="margin-top:7px;" onclick="abrirCorrecaoProcedimentoCliente(${Number(a.id)})">✏️ Corrigir procedimento</button>
+            ` : ""}
           </div>
         `).join("")}
       </div>
     ` : `<p>Você ainda não possui agendamentos.</p>`}
     <button class="primary full" style="margin-top:14px;" onclick="closeModal();openBooking()">Agendar novo horário</button>
   `);
+}
+
+async function abrirCorrecaoProcedimentoCliente(id) {
+  const { user, cliente } = await getCurrentClient();
+  if (!user || !cliente) return openVipModal();
+  const client = adminClient();
+  const { data: agendamento, error } = await client
+    .from("agendamentos")
+    .select("id,cliente_id,servico,data,horario,status")
+    .eq("id", Number(id))
+    .eq("cliente_id", cliente.id)
+    .maybeSingle();
+  if (error || !agendamento) {
+    console.error(error);
+    return alert("Não foi possível localizar este agendamento.");
+  }
+  const status = String(agendamento.status || "").toLowerCase();
+  if (!["confirmado","agendado","pendente"].includes(status)) {
+    return alert("Este agendamento não pode mais ter o procedimento corrigido.");
+  }
+  showModal(`
+    <h2>✏️ Corrigir procedimento</h2>
+    <p class="muted">Atual: <strong>${escapeHtml(agendamento.servico || "Serviço não informado")}</strong><br>${escapeHtml(formatarDataAgendamento(agendamento.data))} às ${escapeHtml(String(agendamento.horario || "").slice(0,5))}</p>
+    <label style="display:block;margin:10px 0;">Novo procedimento
+      <select id="correcaoServicoCliente" style="width:100%;padding:10px;">
+        ${SERVICES.map(s => `<option value="${escapeHtml(s[0])}" ${String(s[0]) === String(agendamento.servico) ? "selected" : ""}>${escapeHtml(s[0])} — ${money(precoAtualServico(s[0]))}</option>`).join("")}
+      </select>
+    </label>
+    <button class="primary full" onclick="salvarCorrecaoProcedimentoCliente(${Number(agendamento.id)})">SALVAR PROCEDIMENTO</button>
+    <button class="secondary full" onclick="abrirMeusAgendamentos()">Voltar</button>
+  `);
+}
+
+async function salvarCorrecaoProcedimentoCliente(id) {
+  const servico = document.getElementById("correcaoServicoCliente")?.value;
+  if (!servico) return alert("Escolha o novo procedimento.");
+  if (!confirm(`Alterar seu procedimento para ${servico}?`)) return;
+  const { user, cliente } = await getCurrentClient();
+  if (!user || !cliente) return openVipModal();
+  const client = adminClient();
+  const { error } = await client
+    .from("agendamentos")
+    .update({ servico })
+    .eq("id", Number(id))
+    .eq("cliente_id", cliente.id);
+  if (error) {
+    console.error(error);
+    return alert("Não foi possível corrigir o procedimento.");
+  }
+  closeModal();
+  await abrirMeusAgendamentos();
+  alert(`Procedimento corrigido com sucesso! 💗\n\nNovo procedimento: ${servico}`);
 }
 
 async function abrirReagendamentoCliente(id) {
