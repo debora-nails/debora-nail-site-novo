@@ -2180,6 +2180,62 @@ window.adminMarcarAgendamento = async function(id, status) {
   if (error) { console.error(error); return alert("Não foi possível atualizar o agendamento."); }
   if (status === "realizado") {
     const { data: a } = await client.from("agendamentos").select("id,cliente_id,servico,data,forma_pagamento,pagamento_status,data_vencimento").eq("id", id).single();
+
+    // Fidelidade: 1 ponto por CLIENTE por DIA.
+    // Se a cliente fizer dois ou mais procedimentos no mesmo dia (ex.: pé + mão),
+    // os atendimentos podem ser marcados como REALIZADO separadamente, mas apenas
+    // o primeiro atendimento realizado daquele dia acrescenta 1 ponto.
+    //
+    // Importante: os pontos NÃO são recalculados pelo total de agendamentos realizados.
+    // Assim, se você corrigir manualmente os pontos no painel VIP, essa correção é preservada.
+    if (a?.cliente_id) {
+      const { data: realizadosDoDia, error: diaError } = await client
+        .from("agendamentos")
+        .select("id,data")
+        .eq("cliente_id", a.cliente_id)
+        .eq("status", "realizado")
+        .eq("data", a.data);
+
+      if (diaError) {
+        console.error("Erro ao verificar ponto do dia:", diaError);
+      } else if (Array.isArray(realizadosDoDia) && realizadosDoDia.length === 1) {
+        // Este é o primeiro atendimento realizado desta cliente nesta data.
+        // Portanto, soma exatamente 1 ponto ao cartão.
+        const { data: vipAtual, error: vipBuscaError } = await client
+          .from("vip_fidelidade")
+          .select("id,pontos,beneficio_usado")
+          .eq("cliente_id", a.cliente_id)
+          .maybeSingle();
+
+        if (vipBuscaError) {
+          console.error("Erro ao localizar cartão VIP:", vipBuscaError);
+        } else if (vipAtual?.id) {
+          const pontosAtuais = Math.min(Math.max(0, Number(vipAtual.pontos || 0)), 10);
+          const novosPontos = Math.min(10, pontosAtuais + 1);
+
+          const { error: vipUpdateError } = await client
+            .from("vip_fidelidade")
+            .update({ pontos: novosPontos })
+            .eq("id", vipAtual.id);
+
+          if (vipUpdateError) {
+            console.error("Erro ao adicionar ponto VIP:", vipUpdateError);
+          }
+        } else {
+          const { error: vipInsertError } = await client
+            .from("vip_fidelidade")
+            .insert({ cliente_id: a.cliente_id, pontos: 1, beneficio_usado: false });
+
+          if (vipInsertError) {
+            console.error("Erro ao criar cartão VIP:", vipInsertError);
+          }
+        }
+      } else {
+        // Já existe outro atendimento realizado desta mesma cliente na mesma data.
+        // Não acrescenta outro ponto.
+        console.log("Ponto VIP não acrescentado: esta cliente já recebeu o ponto deste dia.");
+      }
+    }
     if (a && a.forma_pagamento !== "pagar_depois") {
       await client.from("entradas_financeiro").upsert({
         agendamento_id:a.id, cliente_id:a.cliente_id, servico:a.servico, data:a.data, valor:precoAtualServico(a.servico), forma_pagamento:a.forma_pagamento, desconto:0, status:"pago"
