@@ -1436,47 +1436,127 @@ async function carregarPromocoesPublicas() {
   }
 }
 
+function adminApelidoKey(clienteId) {
+  return `debora_nail_apelido_cliente_${Number(clienteId)}`;
+}
+
+function adminLerApelido(clienteId) {
+  try {
+    return localStorage.getItem(adminApelidoKey(clienteId)) || "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function adminSalvarApelidoLocal(clienteId, apelido) {
+  try {
+    const key = adminApelidoKey(clienteId);
+    const valor = String(apelido || "").trim();
+    if (valor) localStorage.setItem(key, valor);
+    else localStorage.removeItem(key);
+  } catch (_) {}
+}
+
+window.adminEditarApelido = function(clienteId, nomeAtual) {
+  const atual = adminLerApelido(clienteId);
+  const apelido = prompt(
+    `Identificação/apelido de ${nomeAtual || "esta cliente"}:\n\nEx.: Duda, Maria da padaria, Maria 2...`,
+    atual
+  );
+  if (apelido === null) return;
+  adminSalvarApelidoLocal(clienteId, apelido);
+  renderAdminClientes();
+};
+
+window.adminFiltrarClientes = function() {
+  const termo = String(document.getElementById("adminBuscaClientes")?.value || "").trim().toLowerCase();
+  document.querySelectorAll("[data-cliente-admin-card]").forEach(card => {
+    const texto = String(card.getAttribute("data-cliente-admin-card") || "").toLowerCase();
+    card.style.display = !termo || texto.includes(termo) ? "" : "none";
+  });
+};
+
 async function renderAdminClientes() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
   conteudo.innerHTML = `
     <h3>👥 Clientes</h3>
     <p class="muted">Aqui aparecem as clientes que se cadastrarem no site. O pagamento depois fica desligado por padrão.</p>
-    <div id="listaClientesAdmin">Carregando...</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0;">
+      <div style="flex:1;min-width:240px;">
+        <input id="adminBuscaClientes" type="search" placeholder="🔎 Pesquisar por nome, apelido ou WhatsApp..."
+          oninput="adminFiltrarClientes()"
+          style="width:100%;padding:11px 12px;border:1px solid #ead7df;border-radius:12px;">
+      </div>
+      <div id="adminQuantidadeClientes" style="padding:10px 14px;border:1px solid #ead7df;border-radius:12px;background:#fff;font-weight:700;">
+        👥 0 clientes
+      </div>
+    </div>
+    <div id="listaClientesAdmin" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start;">
+      Carregando...
+    </div>
+    <style>
+      @media (max-width: 700px) {
+        #listaClientesAdmin { grid-template-columns: 1fr !important; }
+      }
+    </style>
   `;
   const lista = document.getElementById("listaClientesAdmin");
   try {
     const client = adminClient();
     let timer;
     const rpc = client.rpc("admin_listar_clientes");
-    const timeout = new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Tempo esgotado ao carregar clientes. Verifique a conexão com o Supabase.")), 10000); });
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => reject(new Error("Tempo esgotado ao carregar clientes. Verifique a conexão com o Supabase.")), 10000);
+    });
     const { data, error } = await Promise.race([rpc, timeout]);
     clearTimeout(timer);
     if (error) throw error;
+
     const clientes = Array.isArray(data) ? data : [];
+    const contador = document.getElementById("adminQuantidadeClientes");
+    if (contador) contador.textContent = `👥 ${clientes.length} ${clientes.length === 1 ? "cliente" : "clientes"}`;
+
     if (!clientes.length) {
-      lista.innerHTML = `<div style="padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;">Ainda não há clientes cadastradas. 💗</div>`;
+      lista.innerHTML = `<div style="grid-column:1/-1;padding:18px;border:1px solid #ead7df;border-radius:16px;background:#fff;">Ainda não há clientes cadastradas. 💗</div>`;
       return;
     }
-    lista.innerHTML = clientes.map(c => `
-      <div style="padding:16px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
-        <strong>👤 ${escapeHtml(c.nome || "Cliente")}</strong>
-        <div style="margin-top:5px;">📱 ${escapeHtml(c.whatsapp || "Não informado")}</div>
-        <div>✉️ ${escapeHtml(c.email || "Não informado")}</div>
-        <div style="margin-top:10px;">
-          <label style="display:inline-flex;align-items:center;gap:8px;">
-            <input type="checkbox" ${c.permite_pagamento_posterior ? "checked" : ""}
-              onchange="adminAlternarPagamentoPosterior(${Number(c.id)}, this.checked)">
-            <strong>Permitir “Pagar depois”</strong>
-          </label>
+
+    lista.innerHTML = clientes.map(c => {
+      const nome = c.nome || "Cliente";
+      const whatsapp = c.whatsapp || "";
+      const email = c.email || "";
+      const apelido = adminLerApelido(c.id);
+      const termosBusca = `${nome} ${apelido} ${whatsapp} ${email}`.replace(/"/g, "&quot;");
+
+      return `
+        <div data-cliente-admin-card="${escapeHtml(termosBusca)}"
+          style="padding:14px;border:1px solid #ead7df;border-radius:16px;background:#fff;min-width:0;">
+          <strong>👤 ${escapeHtml(nome)}${apelido ? ` <span style="font-weight:600;color:#777;">(${escapeHtml(apelido)})</span>` : ""}</strong>
+          <div style="margin-top:5px;">📱 ${escapeHtml(whatsapp || "Não informado")}</div>
+          <div>✉️ ${escapeHtml(email || "Não informado")}</div>
+          <div style="margin-top:10px;">
+            <label style="display:inline-flex;align-items:center;gap:8px;">
+              <input type="checkbox" ${c.permite_pagamento_posterior ? "checked" : ""}
+                onchange="adminAlternarPagamentoPosterior(${Number(c.id)}, this.checked)">
+              <strong>Permitir “Pagar depois”</strong>
+            </label>
+          </div>
+          <small style="display:block;margin-top:6px;color:#777;">
+            ${c.permite_pagamento_posterior ? "Cliente autorizada a pagar depois." : "Pagamento depois desativado."}
+          </small>
+          <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:10px;">
+            <button class="secondary small" onclick="adminEditarApelido(${Number(c.id)}, '${escapeHtml(nome).replace(/'/g, "\\'")}')">🏷️ ${apelido ? "Editar identificação" : "Adicionar apelido"}</button>
+            <button class="secondary small" onclick="adminVerHistoricoCliente(${Number(c.id)})">📋 Ver histórico</button>
+          </div>
         </div>
-        <small style="display:block;margin-top:6px;color:#777;">${c.permite_pagamento_posterior ? "Cliente autorizada a pagar depois." : "Pagamento depois desativado."}</small>
-        <button class="secondary small" style="margin-top:10px;" onclick="adminVerHistoricoCliente(${Number(c.id)})">📋 Ver histórico</button>
-      </div>
-    `).join("");
+      `;
+    }).join("");
+
+    adminFiltrarClientes();
   } catch (error) {
     console.error("Erro ao carregar clientes:", error);
-    if (lista) lista.innerHTML = `<div style="padding:16px;border:1px solid #ead7df;border-radius:16px;background:#fff;"><strong>Não foi possível carregar as clientes.</strong><br><small>${escapeHtml(error?.message || "Erro desconhecido")}</small></div>`;
+    if (lista) lista.innerHTML = `<div style="grid-column:1/-1;padding:16px;border:1px solid #ead7df;border-radius:16px;background:#fff;"><strong>Não foi possível carregar as clientes.</strong><br><small>${escapeHtml(error?.message || "Erro desconhecido")}</small></div>`;
   }
 }
 
