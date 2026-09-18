@@ -1818,6 +1818,13 @@ async function renderAdminAgendamentos() {
       String(a.status || "").toLowerCase() === "cancelado" && ocultos.has(Number(a.id))
     ));
 
+    // Atendimentos já realizados saem automaticamente da lista de Agendamentos.
+    // Eles continuam salvos no banco e aparecem no histórico individual da cliente,
+    // que já considera somente os registros com status "realizado".
+    agendamentos = agendamentos.filter(a =>
+      String(a.status || "").toLowerCase() !== "realizado"
+    );
+
     // Organiza da data mais próxima para a mais distante.
     // No mesmo dia, o horário mais cedo aparece primeiro.
     agendamentos = [...agendamentos].sort((a, b) => {
