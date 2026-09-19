@@ -961,7 +961,14 @@ function adminClient() {
   if (!__adminClientInstance) {
     __adminClientInstance = window.supabase.createClient(
       window.SUPABASE_CONFIG.url,
-      window.SUPABASE_CONFIG.publishableKey
+      window.SUPABASE_CONFIG.publishableKey,
+      {
+        auth: {
+          persistSession: true,
+          autoRefreshToken: true,
+          detectSessionInUrl: true
+        }
+      }
     );
   }
   return __adminClientInstance;
@@ -2543,6 +2550,29 @@ window.sairAdmin = async function () {
   if (area) area.style.display = "none";
   alert("Você saiu da Área da Débora.");
 };
+
+// Restaura automaticamente somente a Área da Débora quando a sessão da proprietária
+// ainda estiver válida após fechar/reabrir ou atualizar a página. Não altera a sessão
+// nem a navegação das clientes VIP.
+async function restaurarSessaoAdmin() {
+  try {
+    const resultado = await verificarAdmin();
+    if (!resultado.ok) return;
+    const area = document.getElementById("areaDebora");
+    if (!area) return;
+    area.style.display = "block";
+    await window.abrirAdminAba("horarios");
+  } catch (error) {
+    console.error("Erro ao restaurar a Área da Débora:", error);
+  }
+}
+
+if (!window.__deboraAdminSessionRestoreAdded) {
+  window.__deboraAdminSessionRestoreAdded = true;
+  window.addEventListener("load", () => {
+    setTimeout(restaurarSessaoAdmin, 150);
+  });
+}
 
 // Carrega preços salvos no Supabase sem alterar o visual.
 async function carregarPrecosPublicos() {
