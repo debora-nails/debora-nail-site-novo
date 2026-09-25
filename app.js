@@ -509,8 +509,8 @@ async function openBooking(index = null) {
       <div id="bookingServicesList" style="display:grid;gap:7px;">
         ${SERVICES.map((service, number) => `
           <label style="display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;">
-            <input type="checkbox" name="bookingServices" value="${escapeHtml(service[0])}" ${number === index ? "checked" : ""} onchange="atualizarResumoServicosAgendamento()">
-            <span>${escapeHtml(service[0])} — ${money(precoAtualServico(service[0]))} <small style="opacity:.7">(${formatarDuracao(duracaoServicoMinutos(service[0]))})</small></span>
+            <input type="checkbox" name="bookingServices" value="${escapeHtml(service[0])}" ${number === index ? "checked" : ""} onchange="atualizarResumoServicosAgendamento()" style="width:auto;flex:0 0 auto;margin:0;padding:0;">
+            <span style="flex:1;min-width:0;">${escapeHtml(service[0])} — ${money(precoAtualServico(service[0]))} <small style="opacity:.7">(${formatarDuracao(duracaoServicoMinutos(service[0]))})</small></span>
           </label>
         `).join("")}
       </div>
