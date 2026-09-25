@@ -228,8 +228,8 @@ function detalhesHorariosServicos(servico, horarioInicio) {
 }
 
 function servicosSelecionadosAgendamento() {
-  return [...document.querySelectorAll('input[name="bookingServices"]:checked')]
-    .map(input => input.value)
+  return [...document.querySelectorAll('select[name="bookingServices"]')]
+    .map(select => select.value)
     .filter(Boolean);
 }
 
@@ -279,13 +279,28 @@ function atualizarRestricaoDoHorario() {
   }
   notice.textContent = textoRestricaoHorario(restricao);
   notice.style.display = restricao === "curto" ? "block" : "none";
-  document.querySelectorAll('input[name="bookingServices"]').forEach(input => {
-    const permitido = restricao !== "curto" || restricaoPermiteServico("curto", input.value);
-    input.disabled = !permitido;
-    const label = input.closest("label");
-    if (label) label.style.opacity = permitido ? "1" : ".45";
-    if (!permitido) input.checked = false;
+  document.querySelectorAll('select[name="bookingServices"]').forEach(select => {
+    [...select.options].forEach(option => {
+      if (!option.value) return;
+      option.disabled = restricao === "curto" && !restricaoPermiteServico("curto", option.value);
+    });
+    if (restricao === "curto" && select.value && !restricaoPermiteServico("curto", select.value)) {
+      select.value = "";
+    }
   });
+  atualizarResumoServicosAgendamentoSemRecarregarHorarios();
+}
+
+function atualizarResumoServicosAgendamentoSemRecarregarHorarios() {
+  const selecionados = servicosSelecionadosAgendamento();
+  const box = document.getElementById("bookingServicesSummary");
+  const totalMinutos = selecionados.reduce((total, nome) => total + duracaoServicoMinutos(nome), 0);
+  const totalValor = selecionados.reduce((total, nome) => total + precoAtualServico(nome), 0);
+  if (box) {
+    box.innerHTML = selecionados.length
+      ? `<strong>${selecionados.length} procedimento(s)</strong> · ${formatarDuracao(totalMinutos)} · ${money(totalValor)}`
+      : "Selecione um procedimento.";
+  }
 }
 
 function renderServices() {
@@ -503,18 +518,23 @@ async function openBooking(index = null) {
     <p class="muted">Escolha o serviço, a data e um dos horários liberados pela Débora.</p>
 
     <div>
-      <strong>Procedimentos</strong>
+      <strong>Procedimento</strong>
       <div id="bookingRestrictionNotice" style="display:none;margin:7px 0;padding:9px;border-radius:10px;background:#fff1f6;border:1px solid #ead7df;"></div>
-      <p class="muted" style="margin:4px 0 8px;">Você pode escolher mais de um procedimento no mesmo agendamento. O site soma automaticamente o tempo.</p>
-      <div id="bookingServicesList" style="display:grid;gap:7px;">
-        ${SERVICES.map((service, number) => `
-          <label style="display:flex !important;align-items:center;gap:9px;padding:9px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;">
-            <input type="checkbox" name="bookingServices" value="${escapeHtml(service[0])}" ${number === index ? "checked" : ""} onchange="atualizarResumoServicosAgendamento()" style="width:auto !important;max-width:none !important;flex:0 0 auto !important;margin:0 !important;">
-            <span style="display:block;flex:1;min-width:0;">${escapeHtml(service[0])} — ${money(precoAtualServico(service[0]))} <small style="opacity:.7">(${formatarDuracao(duracaoServicoMinutos(service[0]))})</small></span>
-          </label>
-        `).join("")}
+      <p class="muted" style="margin:4px 0 8px;">Clique abaixo para escolher. Se quiser, você pode adicionar um segundo procedimento.</p>
+      <div id="bookingServicesList" style="display:grid;gap:8px;">
+        <select name="bookingServices" id="bookingService1" onchange="atualizarResumoServicosAgendamento(); atualizarRestricaoDoHorario()">
+          <option value="">Escolha o procedimento</option>
+          ${SERVICES.map((service, number) => `<option value="${escapeHtml(service[0])}" ${number === index ? "selected" : ""}>${escapeHtml(service[0])} — ${money(precoAtualServico(service[0]))} (${formatarDuracao(duracaoServicoMinutos(service[0]))})</option>`).join("")}
+        </select>
+        <div id="bookingSecondServiceBox" style="display:none;">
+          <select name="bookingServices" id="bookingService2" onchange="atualizarResumoServicosAgendamento(); atualizarRestricaoDoHorario()">
+            <option value="">Escolha o segundo procedimento</option>
+            ${SERVICES.map(service => `<option value="${escapeHtml(service[0])}">${escapeHtml(service[0])} — ${money(precoAtualServico(service[0]))} (${formatarDuracao(duracaoServicoMinutos(service[0]))})</option>`).join("")}
+          </select>
+        </div>
+        <button type="button" class="secondary small" id="bookingAddSecondService" onclick="adicionarSegundoProcedimento()">＋ Adicionar outro procedimento</button>
       </div>
-      <div id="bookingServicesSummary" class="muted" style="margin-top:9px;padding:9px;border-radius:10px;background:#f8edf3;">Selecione pelo menos um procedimento.</div>
+      <div id="bookingServicesSummary" class="muted" style="margin-top:9px;padding:9px;border-radius:10px;background:#f8edf3;">Selecione um procedimento.</div>
     </div>
 
     <label>
@@ -578,6 +598,16 @@ async function openBooking(index = null) {
 
   await atualizarOpcaoPagarDepoisAgendamento();
   atualizarPagamentoAgendamento();
+}
+
+function adicionarSegundoProcedimento() {
+  const box = document.getElementById("bookingSecondServiceBox");
+  const button = document.getElementById("bookingAddSecondService");
+  if (!box) return;
+  box.style.display = "block";
+  if (button) button.style.display = "none";
+  atualizarRestricaoDoHorario();
+  document.getElementById("bookingService2")?.focus();
 }
 
 async function atualizarOpcaoPagarDepoisAgendamento() {
@@ -724,7 +754,7 @@ function atualizarOpcaoEncaixe() {
 }
 
 function solicitarEncaixeWhatsApp() {
-  const service = document.getElementById("bookingService")?.value || "um atendimento";
+  const service = servicosSelecionadosAgendamento().join(" + ") || "um atendimento";
   const date = document.getElementById("bookingDate")?.value || "";
   const dataFormatada = date ? date.split("-").reverse().join("/") : "";
   const message = `Olá, Débora! 💗 Gostaria de solicitar um encaixe para ${service}${dataFormatada ? ` no dia ${dataFormatada}` : ""}. Se houver algum horário disponível, por favor me avise. 💅✨`;
