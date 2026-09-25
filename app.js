@@ -1667,6 +1667,15 @@ window.adminDesativarPromocao = async function (id) {
   await carregarPromocoesPublicas();
 };
 
+window.adminExcluirPromocao = async function (id) {
+  if (!confirm("Apagar esta promoção expirada?")) return;
+  const client = adminClient();
+  const { error } = await client.from("promocoes").delete().eq("id", id);
+  if (error) return alert("Não foi possível apagar a promoção.");
+  renderAdminPromocoes();
+  await carregarPromocoesPublicas();
+};
+
 async function renderAdminPromocoes() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
@@ -1690,16 +1699,22 @@ async function renderAdminPromocoes() {
     document.getElementById("listaPromosAdmin").textContent = "Não foi possível carregar as promoções.";
     return;
   }
-  document.getElementById("listaPromosAdmin").innerHTML = (data || []).map(r => `
-    <div style="padding:12px;border-bottom:1px solid #eee;">
-      <strong>${r.servico || r.titulo}</strong><br>
-      ${r.servico ? `Preço original: ${money(Number(SERVICES.find(s => s[0] === r.servico)?.[1] || 0))}<br>` : ""}
-      ${r.preco_promocional != null ? `Promoção: ${money(Number(r.preco_promocional))}<br>` : ""}
-      ${r.data_inicio ? `Início: ${r.data_inicio}<br>` : ""}
-      ${r.data_fim ? `Fim: ${r.data_fim}<br>` : ""}
-      Status: ${r.ativo ? "Ativa" : "Inativa"}
-      ${r.ativo ? `<button class="primary small" onclick="adminDesativarPromocao(${r.id})">Desativar</button>` : ""}
-    </div>`).join("") || "Nenhuma promoção cadastrada.";
+  const hoje = new Date().toISOString().slice(0, 10);
+  document.getElementById("listaPromosAdmin").innerHTML = (data || []).map(r => {
+    const expirada = Boolean(r.data_fim && r.data_fim < hoje);
+    const status = expirada ? "Expirada" : (r.ativo ? "Ativa" : "Inativa");
+    return `
+      <div style="padding:12px;border-bottom:1px solid #eee;">
+        <strong>${r.servico || r.titulo}</strong><br>
+        ${r.servico ? `Preço original: ${money(Number(SERVICES.find(s => s[0] === r.servico)?.[1] || 0))}<br>` : ""}
+        ${r.preco_promocional != null ? `Promoção: ${money(Number(r.preco_promocional))}<br>` : ""}
+        ${r.data_inicio ? `Início: ${r.data_inicio}<br>` : ""}
+        ${r.data_fim ? `Fim: ${r.data_fim}<br>` : ""}
+        Status: ${status}
+        ${r.ativo && !expirada ? `<button class="primary small" onclick="adminDesativarPromocao(${r.id})">Desativar</button>` : ""}
+        ${expirada ? `<button class="secondary small" onclick="adminExcluirPromocao(${r.id})" style="margin-left:6px;">❌ Apagar</button>` : ""}
+      </div>`;
+  }).join("") || "Nenhuma promoção cadastrada.";
 }
 
 async function carregarPromocoesPublicas() {
