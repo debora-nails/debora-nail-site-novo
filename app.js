@@ -282,11 +282,13 @@ async function carregarHorariosDisponiveis() {
   if (!date) return;
 
   const client = adminClient();
+  // Carregamos TODOS os horários da data, inclusive os bloqueados.
+  // Isso é importante: se houver apenas um horário salvo como indisponível,
+  // não podemos interpretar a data como se nunca tivesse sido configurada.
   const { data: horarios, error } = await client
     .from("horarios")
-    .select("horario")
+    .select("horario,disponivel")
     .eq("data", date)
-    .eq("disponivel", true)
     .order("horario");
 
   if (error) {
@@ -301,11 +303,17 @@ async function carregarHorariosDisponiveis() {
     .eq("data", date)
     .in("status", ["confirmado", "agendado", "pendente"]);
 
-  if (agError) console.error(agError);
+  // Se não conseguirmos consultar os agendamentos, NÃO mostramos horários como livres.
+  // Assim evitamos que um erro de leitura faça um horário já marcado aparecer disponível.
+  if (agError) {
+    console.error(agError);
+    select.innerHTML = `<option value="">Não foi possível verificar os horários já agendados</option>`;
+    if (status) status.textContent = "Tente novamente em alguns segundos.";
+    return;
+  }
 
-  // Se ainda não houver horários salvos para esta data, usa automaticamente o padrão
-  // de segunda a sábado. Quando você salvar uma data no painel, os horários daquela
-  // data passam a obedecer exatamente ao que foi configurado por você.
+  // Só usamos os horários padrão quando a data realmente não possui nenhuma
+  // configuração salva. Um horário bloqueado continua bloqueado após atualizar.
   let horariosBase = horarios || [];
   if (!horariosBase.length) {
     const [y,m,d] = date.split("-").map(Number);
@@ -1126,24 +1134,75 @@ async function atualizarHorariosEmLote() {
     return;
   }
 
-  const linhas = (existentes && existentes.length)
-    ? existentes.map(r => ({ id:r.id, horario:String(r.horario).slice(0,5), disponivel:!!r.disponivel }))
-    : HORARIOS_PADRAO.map(h => ({ id:null, horario:h, disponivel:true }));
+  // A data sempre parte dos horários padrão de segunda a sábado.
+  // Os registros já salvos substituem somente o horário correspondente,
+  // preservando bloqueios e alterações feitas pela Débora.
+  const existentesPorHora = new Map(
+    (existentes || []).map(r => [String(r.horario).slice(0,5), r])
+  );
+  const linhas = [];
+  const adicionados = new Set();
+
+  for (const horario of HORARIOS_PADRAO) {
+    const existente = existentesPorHora.get(horario);
+    if (existente) {
+      linhas.push({
+        id: existente.id,
+        horario,
+        disponivel: !!existente.disponivel
+      });
+      adicionados.add(horario);
+    } else {
+      linhas.push({
+        id: null,
+        horario,
+        disponivel: true
+      });
+    }
+  }
+
+  // Mantém também horários personalizados que a Débora tenha criado.
+  for (const r of (existentes || [])) {
+    const horario = String(r.horario).slice(0,5);
+    if (adicionados.has(horario) || HORARIOS_PADRAO.includes(horario)) continue;
+    linhas.push({
+      id: r.id,
+      horario,
+      disponivel: !!r.disponivel
+    });
+  }
 
   const [y,m,d] = data.split("-").map(Number);
   const diaSemana = new Date(y, m - 1, d).getDay();
   const nomes = ["domingo","segunda-feira","terça-feira","quarta-feira","quinta-feira","sexta-feira","sábado"];
 
+  // Verificamos os horários ocupados para não oferecer remoção de um horário
+  // que já esteja ligado a um agendamento ativo.
+  const { data: agendados, error: agError } = await client
+    .from("agendamentos")
+    .select("horario")
+    .eq("data", data)
+    .in("status", ["confirmado", "agendado", "pendente"]);
+
+  if (agError) {
+    console.error(agError);
+    box.innerHTML = `<small>Não foi possível verificar os agendamentos desta data. Tente novamente.</small>`;
+    return;
+  }
+
+  const ocupados = new Set((agendados || []).map(a => String(a.horario).slice(0,5)));
+
   box.innerHTML = `
     <div style="margin-top:12px;padding:14px;border:1px solid #ead7df;border-radius:14px;background:#fff;">
       <strong>Horários de ${nomes[diaSemana]} — ${d.toString().padStart(2,"0")}/${m.toString().padStart(2,"0")}/${y}</strong>
-      <p style="margin:5px 0 10px;opacity:.75">Os horários padrão já aparecem abaixo. Você pode editar o horário ou desmarcar para não disponibilizar naquele dia.</p>
-      <div style="display:grid;gap:8px;">
-        ${linhas.map((r,i) => `
+      <p style="margin:5px 0 10px;opacity:.75">Os horários padrão aparecem abaixo. Você pode bloquear, liberar, alterar ou remover um horário. Horários já agendados ficam protegidos.</p>
+      <div id="adminHorariosLinhas" style="display:grid;gap:8px;">
+        ${linhas.map(r => `
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;">
             <input type="checkbox" class="adminHorarioEditarDisponivel" data-id="${r.id ?? ''}" ${r.disponivel ? "checked" : ""}>
             <input type="time" class="adminHorarioEditarHora" value="${r.horario}" min="00:00" max="23:59" style="max-width:125px;">
-            <span style="opacity:.7">${r.disponivel ? "Disponível" : "Indisponível"}</span>
+            <span class="adminHorarioEditarStatus" style="opacity:.7">${r.disponivel ? "Disponível" : "Indisponível"}</span>
+            ${ocupados.has(r.horario) ? `<span style="font-size:.86em;opacity:.7">🔒 Agendado</span>` : `<button type="button" class="secondary small adminHorarioExcluirLinha" title="Remover este horário">✕</button>`}
           </div>`).join("")}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
@@ -1151,14 +1210,19 @@ async function atualizarHorariosEmLote() {
         <button class="secondary small" onclick="adminAdicionarLinhaHorario()">➕ Adicionar outro horário</button>
       </div>
     </div>`;
+
+  box.querySelectorAll('.adminHorarioExcluirLinha').forEach(btn => {
+    btn.addEventListener('click', () => btn.closest('div[style*="border:1px solid #ead7df"]')?.remove());
+  });
 }
 
 window.adminAdicionarLinhaHorario = function () {
-  const box = document.querySelector('#adminHorariosLote > div');
+  const box = document.getElementById("adminHorariosLinhas");
   if (!box) return;
   const row = document.createElement('div');
   row.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;';
-  row.innerHTML = `<input type="checkbox" class="adminHorarioEditarDisponivel" checked><input type="time" class="adminHorarioEditarHora" value="18:00" min="00:00" max="23:59" style="max-width:125px;"><span style="opacity:.7">Disponível</span>`;
+  row.innerHTML = `<input type="checkbox" class="adminHorarioEditarDisponivel" checked><input type="time" class="adminHorarioEditarHora" value="18:00" min="00:00" max="23:59" style="max-width:125px;"><span class="adminHorarioEditarStatus" style="opacity:.7">Disponível</span><button type="button" class="secondary small adminHorarioExcluirLinha" title="Remover este horário">✕</button>`;
+  row.querySelector('.adminHorarioExcluirLinha')?.addEventListener('click', () => row.remove());
   box.appendChild(row);
 };
 
@@ -1166,12 +1230,12 @@ window.adminSalvarHorariosEditados = async function () {
   const data = document.getElementById("adminDataHorario")?.value;
   if (!data) return alert("Escolha a data.");
 
-  const rowEls = [...document.querySelectorAll("#adminHorariosLote > div > div")];
+  const rowEls = [...document.querySelectorAll("#adminHorariosLinhas > div")];
   if (!rowEls.length) return alert("Adicione pelo menos um horário.");
 
   const client = adminClient();
   try {
-    // Primeiro lemos os registros atuais para conseguir sincronizar a data inteira.
+    // Primeiro lemos os registros atuais para sincronizar a data inteira.
     const { data: atuais, error: leituraError } = await client
       .from("horarios")
       .select("id,horario,disponivel")
@@ -1184,7 +1248,7 @@ window.adminSalvarHorariosEditados = async function () {
     for (const row of rowEls) {
       const inputHora = row.querySelector(".adminHorarioEditarHora");
       const check = row.querySelector(".adminHorarioEditarDisponivel");
-      const horario = inputHora?.value;
+      const horario = String(inputHora?.value || "").slice(0,5);
       if (!horario) continue;
 
       if (horariosSelecionados.has(horario)) {
@@ -1214,8 +1278,8 @@ window.adminSalvarHorariosEditados = async function () {
       }
     }
 
-    // Linhas que foram removidas do editor deixam de existir para aquela data.
-    // Só removemos horários que não estão ocupados por um agendamento ativo.
+    // Linhas removidas do editor deixam de existir, mas nunca apagamos um horário
+    // que esteja ocupado por um agendamento ativo.
     const idsParaExcluir = (atuais || [])
       .filter(r => !idsMantidos.has(Number(r.id)))
       .map(r => Number(r.id));
