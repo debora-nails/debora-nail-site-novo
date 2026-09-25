@@ -228,9 +228,25 @@ function detalhesHorariosServicos(servico, horarioInicio) {
 }
 
 function servicosSelecionadosAgendamento() {
-  return [...document.querySelectorAll('input[name="bookingServices"]:checked')]
-    .map(input => input.value)
-    .filter(Boolean);
+  return [
+    document.getElementById("bookingService1")?.value || "",
+    document.getElementById("bookingService2")?.value || ""
+  ].filter(Boolean);
+}
+
+function atualizarSegundoProcedimentoAgendamento() {
+  const s1 = document.getElementById("bookingService1");
+  const s2 = document.getElementById("bookingService2");
+  if (!s1 || !s2) return;
+  const atual2 = s2.value;
+  [...s2.options].forEach(option => {
+    if (!option.value) return;
+    option.disabled = Boolean(s1.value && option.value === s1.value);
+  });
+  if (s2.value && s2.value === s1.value) s2.value = "";
+  if (atual2 && s2.value !== atual2 && !s2.value) {
+    s2.value = "";
+  }
 }
 
 function atualizarResumoServicosAgendamento() {
@@ -279,13 +295,18 @@ function atualizarRestricaoDoHorario() {
   }
   notice.textContent = textoRestricaoHorario(restricao);
   notice.style.display = restricao === "curto" ? "block" : "none";
-  document.querySelectorAll('input[name="bookingServices"]').forEach(input => {
-    const permitido = restricao !== "curto" || restricaoPermiteServico("curto", input.value);
-    input.disabled = !permitido;
-    const label = input.closest("label");
-    if (label) label.style.opacity = permitido ? "1" : ".45";
-    if (!permitido) input.checked = false;
+  ["bookingService1", "bookingService2"].forEach(id => {
+    const select = document.getElementById(id);
+    if (!select) return;
+    [...select.options].forEach(option => {
+      if (!option.value) return;
+      const permitido = restricao !== "curto" || restricaoPermiteServico("curto", option.value);
+      option.disabled = !permitido;
+    });
+    if (select.value && select.options[select.selectedIndex]?.disabled) select.value = "";
   });
+  atualizarSegundoProcedimentoAgendamento();
+  atualizarResumoServicosAgendamento();
 }
 
 function renderServices() {
@@ -505,15 +526,21 @@ async function openBooking(index = null) {
     <div>
       <strong>Procedimentos</strong>
       <div id="bookingRestrictionNotice" style="display:none;margin:7px 0;padding:9px;border-radius:10px;background:#fff1f6;border:1px solid #ead7df;"></div>
-      <p class="muted" style="margin:4px 0 8px;">Você pode escolher mais de um procedimento no mesmo agendamento. O site soma automaticamente o tempo.</p>
-      <div id="bookingServicesList" style="display:grid;gap:7px;">
-        ${SERVICES.map((service, number) => `
-          <label style="display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;">
-            <input type="checkbox" name="bookingServices" value="${escapeHtml(service[0])}" ${number === index ? "checked" : ""} onchange="atualizarResumoServicosAgendamento()">
-            <span>${escapeHtml(service[0])} — ${money(precoAtualServico(service[0]))} <small style="opacity:.7">(${formatarDuracao(duracaoServicoMinutos(service[0]))})</small></span>
-          </label>
-        `).join("")}
-      </div>
+      <p class="muted" style="margin:4px 0 8px;">Escolha o primeiro procedimento. Se quiser, adicione um segundo.</p>
+      <label style="display:block;margin:0 0 8px;">
+        Procedimento 1
+        <select id="bookingService1" style="width:100%;padding:10px;" onchange="atualizarSegundoProcedimentoAgendamento(); atualizarResumoServicosAgendamento();">
+          <option value="">Escolha o procedimento</option>
+          ${SERVICES.map(service => `<option value="${escapeHtml(service[0])}" ${index != null && SERVICES[index]?.[0] === service[0] ? "selected" : ""}>${escapeHtml(service[0])} — ${money(precoAtualServico(service[0]))} (${formatarDuracao(duracaoServicoMinutos(service[0]))})</option>`).join("")}
+        </select>
+      </label>
+      <label style="display:block;margin:0 0 8px;">
+        Procedimento 2 <small class="muted">(opcional)</small>
+        <select id="bookingService2" style="width:100%;padding:10px;" onchange="atualizarResumoServicosAgendamento();">
+          <option value="">Nenhum</option>
+          ${SERVICES.map(service => `<option value="${escapeHtml(service[0])}">${escapeHtml(service[0])} — ${money(precoAtualServico(service[0]))} (${formatarDuracao(duracaoServicoMinutos(service[0]))})</option>`).join("")}
+        </select>
+      </label>
       <div id="bookingServicesSummary" class="muted" style="margin-top:9px;padding:9px;border-radius:10px;background:#f8edf3;">Selecione pelo menos um procedimento.</div>
     </div>
 
