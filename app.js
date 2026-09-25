@@ -1305,7 +1305,8 @@ async function atualizarHorariosEmLote() {
         id: existente.id,
         horario,
         disponivel: !!existente.disponivel,
-        restricao: existente.restricao || ""
+        restricao: existente.restricao || "",
+        isAvulso: !HORARIOS_PADRAO.includes(horario)
       });
       adicionados.add(horario);
     } else {
@@ -1313,7 +1314,8 @@ async function atualizarHorariosEmLote() {
         id: null,
         horario,
         disponivel: true,
-        restricao: ""
+        restricao: "",
+        isAvulso: false
       });
     }
   }
@@ -1326,7 +1328,8 @@ async function atualizarHorariosEmLote() {
       id: r.id,
       horario,
       disponivel: !!r.disponivel,
-      restricao: r.restricao || ""
+      restricao: r.restricao || "",
+      isAvulso: true
     });
   }
 
@@ -1353,7 +1356,7 @@ async function atualizarHorariosEmLote() {
   box.innerHTML = `
     <div style="margin-top:12px;padding:14px;border:1px solid #ead7df;border-radius:14px;background:#fff;">
       <strong>Horários de ${nomes[diaSemana]} — ${d.toString().padStart(2,"0")}/${m.toString().padStart(2,"0")}/${y}</strong>
-      <p style="margin:5px 0 10px;opacity:.75">Os horários padrão aparecem abaixo. Você pode bloquear, liberar, alterar ou remover um horário. Horários já agendados ficam protegidos.</p>
+      <p style="margin:5px 0 10px;opacity:.75">Os horários padrão aparecem abaixo. Horários avulsos podem ser apagados pelo ❌. Horários já agendados ficam protegidos.</p>
       <div id="adminHorariosLinhas" style="display:grid;gap:8px;">
         ${linhas.map(r => `
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;">
@@ -1364,7 +1367,7 @@ async function atualizarHorariosEmLote() {
               <option value="curto" ${r.restricao === "curto" ? "selected" : ""}>Somente Manicure/Pedicure</option>
             </select>
             <span class="adminHorarioEditarStatus" style="opacity:.7">${r.disponivel ? "Disponível" : "Indisponível"}</span>
-            ${ocupados.has(r.horario) ? `<span style="font-size:.86em;opacity:.7">🔒 Agendado</span>` : `<button type="button" class="secondary small adminHorarioExcluirLinha" title="Remover este horário">✕</button>`}
+            ${ocupados.has(r.horario) ? `<span style="font-size:.86em;opacity:.7">🔒 Agendado</span>` : (r.isAvulso ? `<button type="button" class="secondary small adminHorarioExcluirLinha" title="Apagar horário avulso">✕</button>` : "") }
           </div>`).join("")}
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;">
@@ -1509,47 +1512,59 @@ window.adminExcluirHorarioAvulso = async function (id, data, horario) {
   await renderAdminHorarios();
 };
 
+function inicioDaSemanaISO() {
+  const hoje = new Date();
+  const dia = hoje.getDay() || 7;
+  const segunda = new Date(hoje);
+  segunda.setHours(0,0,0,0);
+  segunda.setDate(hoje.getDate() - dia + 1);
+  return segunda;
+}
+
+function dataISO(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+}
+
+function montarSemanaAdminHorarios() {
+  const box = document.getElementById("adminSemanaHorarios");
+  if (!box) return;
+  const nomes = ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
+  const inicio = inicioDaSemanaISO();
+  box.innerHTML = nomes.map((nome, i) => {
+    const d = new Date(inicio);
+    d.setDate(inicio.getDate() + i);
+    const iso = dataISO(d);
+    return `<button type="button" class="secondary small adminDiaSemanaBtn" data-data="${iso}" style="min-width:105px;">${nome}<br><small>${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}</small></button>`;
+  }).join("");
+  box.querySelectorAll(".adminDiaSemanaBtn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const data = btn.dataset.data;
+      const input = document.getElementById("adminDataHorario");
+      if (input) input.value = data;
+      box.querySelectorAll(".adminDiaSemanaBtn").forEach(b => b.classList.remove("primary"));
+      btn.classList.add("primary");
+      atualizarHorariosEmLote();
+    });
+  });
+
+  const hoje = dataISO(new Date());
+  const primeiro = box.querySelector(`[data-data="${hoje}"]`) || box.querySelector(".adminDiaSemanaBtn");
+  if (primeiro) primeiro.click();
+}
+
 async function renderAdminHorarios() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
   conteudo.innerHTML = `<h3>📅 Horários</h3>
-    <p>Escolha uma data. Os horários padrão aparecem automaticamente e você pode editar cada um antes de salvar.</p>
+    <p>Escolha um dia da semana para ver e editar os horários daquele dia.</p>
+    <div id="adminSemanaHorarios" style="display:flex;gap:7px;flex-wrap:wrap;margin:12px 0 14px;"></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
       <label>Data<input id="adminDataHorario" type="date" onchange="atualizarHorariosEmLote()"></label>
       <label>Horário<input id="adminHoraHorario" type="time" min="00:00" max="23:59"></label>
       <button class="secondary small" onclick="adminAdicionarHorario()">Adicionar horário avulso</button>
     </div>
-    <div id="adminHorariosLote"></div>
-    <div id="listaHorariosAdmin" style="margin-top:18px">Carregando...</div>`;
-  const client = adminClient();
-  const { data, error } = await client.from("horarios").select("id,data,horario,disponivel,restricao").order("data").order("horario");
-  if (error) { document.getElementById("listaHorariosAdmin").textContent = "Não foi possível carregar os horários."; return; }
-
-  // Mostra também quando um horário foi efetivamente ocupado por uma cliente.
-  const datas = [...new Set((data || []).map(r => r.data).filter(Boolean))];
-  const ocupados = new Set();
-  for (const dia of datas) {
-    const { data: ags } = await client
-      .from("agendamentos")
-      .select("data,horario,status")
-      .eq("data", dia)
-      .in("status", ["confirmado", "agendado", "pendente"]);
-    (ags || []).forEach(a => ocupados.add(`${a.data}|${String(a.horario).slice(0,5)}`));
-  }
-
-  document.getElementById("listaHorariosAdmin").innerHTML = (data || []).map(r => {
-    const chave = `${r.data}|${String(r.horario).slice(0,5)}`;
-    const agendado = ocupados.has(chave);
-    const statusTexto = agendado ? "Agendado" : (r.disponivel ? (r.restricao === "curto" ? "Só Manicure/Pedicure" : "Disponível") : "Indisponível");
-    return `
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border-bottom:1px solid #eee;">
-      <span>${r.data} — ${String(r.horario).slice(0,5)} — ${statusTexto}</span>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        ${agendado ? `<span style="opacity:.7">🔒</span>` : `<button class="primary small" onclick="adminAlterarHorario(${r.id}, ${r.disponivel})">${r.disponivel ? "Bloquear" : "Liberar"}</button>`}
-        ${agendado ? "" : `<button type="button" class="secondary small" onclick="adminExcluirHorarioAvulso(${r.id}, '${String(r.data).replace(/'/g,"\'")}', '${String(r.horario).slice(0,5)}')" title="Apagar este horário">✕</button>`}
-      </div>
-    </div>`;
-  }).join("") || "Nenhum horário cadastrado ainda.";
+    <div id="adminHorariosLote"></div>`;
+  montarSemanaAdminHorarios();
 }
 
 window.adminAdicionarFoto = async function () {
