@@ -297,18 +297,18 @@ async function carregarHorariosDisponiveis() {
     return;
   }
 
-  const { data: agendados, error: agError } = await client
-    .from("agendamentos")
-    .select("horario")
-    .eq("data", date)
-    .in("status", ["confirmado", "agendado", "pendente"]);
+  // As clientes não podem consultar diretamente os agendamentos de outras clientes
+  // por causa das regras de segurança (RLS). A consulta direta pode retornar
+  // vazia mesmo existindo reservas. Usamos uma função pública que retorna
+  // SOMENTE os horários ocupados, sem expor nome, WhatsApp ou qualquer dado da cliente.
+  const { data: agendados, error: agError } = await client.rpc("horarios_ocupados_publicos", {
+    data_busca: date
+  });
 
-  // Se não conseguirmos consultar os agendamentos, NÃO mostramos horários como livres.
-  // Assim evitamos que um erro de leitura faça um horário já marcado aparecer disponível.
   if (agError) {
-    console.error(agError);
-    select.innerHTML = `<option value="">Não foi possível verificar os horários já agendados</option>`;
-    if (status) status.textContent = "Tente novamente em alguns segundos.";
+    console.error("Erro ao verificar horários ocupados:", agError);
+    select.innerHTML = `<option value="">Não foi possível verificar os horários. Tente novamente.</option>`;
+    if (status) status.textContent = "A disponibilidade não pôde ser confirmada agora.";
     return;
   }
 
@@ -323,10 +323,21 @@ async function carregarHorariosDisponiveis() {
     }
   }
 
-  const ocupados = new Set((agendados || []).map(item => String(item.horario).slice(0,5)));
+  // Cancelado, realizado e falta liberam o horário. Qualquer outro status
+  // representa um agendamento que deve bloquear o horário para novas clientes.
+  const ocupados = new Set(
+    (agendados || [])
+      .filter(item => {
+        const s = String(item.status || "").trim().toLowerCase();
+        return !["cancelado", "realizado", "falta"].includes(s);
+      })
+      .map(item => String(item.horario || "").slice(0,5))
+      .filter(Boolean)
+  );
+
   const disponiveis = horariosBase
     .filter(item => item.disponivel !== false)
-    .filter(item => !ocupados.has(String(item.horario).slice(0,5)));
+    .filter(item => !ocupados.has(String(item.horario || "").slice(0,5)));
 
   if (!disponiveis.length) {
     select.innerHTML = `<option value="">Nenhum horário disponível nesta data</option>`;
@@ -515,6 +526,50 @@ async function confirmarAgendamento() {
 
   if (payment === "pagar_depois" && !cliente.permite_pagamento_posterior) {
     alert("O pagamento posterior não está liberado para este cadastro.");
+    return;
+  }
+
+  // Última proteção: antes de gravar, verificamos novamente se o horário
+  // continua livre. Isso evita dupla reserva mesmo se duas clientes abrirem
+  // a tela ao mesmo tempo.
+  const { data: conflitos, error: conflitoError } = await client
+    .from("agendamentos")
+    .select("id,horario,status")
+    .eq("data", date)
+    .eq("horario", time);
+
+  if (conflitoError) {
+    console.error(conflitoError);
+    alert("Não foi possível confirmar se esse horário continua livre. Tente novamente.");
+    return;
+  }
+
+  const existeConflito = (conflitos || []).some(item => {
+    const s = String(item.status || "").trim().toLowerCase();
+    return !["cancelado", "realizado", "falta"].includes(s);
+  });
+
+  if (existeConflito) {
+    alert("Esse horário já está reservado. Escolha outro horário.");
+    await carregarHorariosDisponiveis();
+    return;
+  }
+
+  // Segunda proteção: verifica novamente o horário imediatamente antes de gravar.
+  const { data: ocupadoAgora, error: ocupadoAgoraError } = await client.rpc("horarios_ocupados_publicos", {
+    data_busca: date
+  });
+  if (ocupadoAgoraError) {
+    console.error(ocupadoAgoraError);
+    alert("Não foi possível confirmar se esse horário ainda está livre. Tente novamente.");
+    return;
+  }
+  const horarioJaOcupado = (ocupadoAgora || []).some(item =>
+    String(item.horario).slice(0,5) === String(time).slice(0,5)
+  );
+  if (horarioJaOcupado) {
+    alert("Esse horário já foi reservado. Escolha outro horário.");
+    await carregarHorariosDisponiveis();
     return;
   }
 
