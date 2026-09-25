@@ -458,19 +458,11 @@ async function carregarHorariosDisponiveis() {
     .filter(item => item.disponivel === false)
     .map(item => String(item.horario || "").slice(0,5)));
 
-  // A agenda continua respeitando a jornada padrão de segunda a sábado,
-  // mas agora cria também os horários de 1 em 1 hora entre o início e o fim.
-  // Assim, depois de um serviço de 1h às 07:00, 08:00 pode ser oferecido.
+  // Mostra somente os horários padrão definidos pela Débora.
+  // Se ela adicionar um horário avulso na Área da Débora, esse horário também entra aqui.
+  // Não cria horários intermediários automaticamente (08:00, 10:00, 12:00 etc.).
   const horariosConfigurados = (horarios || []).map(item => String(item.horario || "").slice(0,5)).filter(Boolean);
-  const pontosDeInicio = [...new Set([...horarioPadraoDoDia, ...horariosConfigurados])];
-  const minutosPontos = pontosDeInicio.map(horaParaMinutos).filter(Number.isFinite);
-  let candidatos = [];
-  if (minutosPontos.length) {
-    const inicio = Math.min(...minutosPontos);
-    const fim = Math.max(...minutosPontos);
-    for (let minuto = inicio; minuto <= fim; minuto += 60) candidatos.push(minutosParaHora(minuto));
-    candidatos = [...new Set([...candidatos, ...pontosDeInicio])];
-  }
+  const candidatos = [...new Set([...horarioPadraoDoDia, ...horariosConfigurados])];
 
   const agendamentosAtivos = (agendados || []).filter(item => {
     const s = String(item.status || "").trim().toLowerCase();
