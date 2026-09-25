@@ -1668,7 +1668,7 @@ window.adminDesativarPromocao = async function (id) {
 };
 
 window.adminExcluirPromocao = async function (id) {
-  if (!confirm("Apagar esta promoção expirada?")) return;
+  if (!confirm("Apagar esta promoção? Essa ação não pode ser desfeita.")) return;
   const client = adminClient();
   const { error } = await client.from("promocoes").delete().eq("id", id);
   if (error) return alert("Não foi possível apagar a promoção.");
@@ -1712,7 +1712,7 @@ async function renderAdminPromocoes() {
         ${r.data_fim ? `Fim: ${r.data_fim}<br>` : ""}
         Status: ${status}
         ${r.ativo && !expirada ? `<button class="primary small" onclick="adminDesativarPromocao(${r.id})">Desativar</button>` : ""}
-        ${expirada ? `<button class="secondary small" onclick="adminExcluirPromocao(${r.id})" style="margin-left:6px;">❌ Apagar</button>` : ""}
+        ${(!r.ativo || expirada) ? `<button class="secondary small" onclick="adminExcluirPromocao(${r.id})" style="margin-left:6px;">❌ Apagar</button>` : ""}
       </div>`;
   }).join("") || "Nenhuma promoção cadastrada.";
 }
