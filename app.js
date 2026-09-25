@@ -1486,20 +1486,6 @@ window.adminAdicionarHorario = async function () {
   renderAdminHorarios();
 };
 
-window.adminExcluirHorarioAvulso = async function (id) {
-  if (!id) return;
-  if (!confirm("Excluir este horário avulso?")) return;
-  const client = adminClient();
-  const { data: row, error: rError } = await client.from("horarios").select("id,data,horario").eq("id", Number(id)).maybeSingle();
-  if (rError || !row) return alert("Não foi possível localizar este horário.");
-  const { data: ocupados, error: oError } = await client.from("agendamentos").select("id").eq("data", row.data).eq("horario", row.horario).in("status", ["confirmado","agendado","pendente"]).limit(1);
-  if (oError) return alert("Não foi possível verificar se o horário está ocupado.");
-  if (ocupados?.length) return alert("Esse horário já tem um agendamento e não pode ser apagado. Você pode bloqueá-lo.");
-  const { error } = await client.from("horarios").delete().eq("id", Number(id));
-  if (error) return alert("Não foi possível apagar o horário avulso.");
-  await renderAdminHorarios();
-};
-
 window.adminAlterarHorario = async function (id, disponivel) {
   const client = adminClient();
   const { error } = await client.from("horarios").update({ disponivel: !disponivel }).eq("id", id);
@@ -1507,60 +1493,60 @@ window.adminAlterarHorario = async function (id, disponivel) {
   renderAdminHorarios();
 };
 
-window.montarDiasDaSemanaAdmin = function () {
-  const semana = document.getElementById("adminSemanaHorario")?.value;
-  const box = document.getElementById("adminDiasSemana");
-  if (!semana || !box) return;
-  const [y,m,d] = semana.split("-").map(Number);
-  const base = new Date(y, m - 1, d);
-  const day = base.getDay() || 7;
-  base.setDate(base.getDate() - day + 1);
-  const nomes = ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado"];
-  box.innerHTML = nomes.map((nome,i) => {
-    const dt = new Date(base); dt.setDate(base.getDate()+i);
-    const iso = dt.toISOString().slice(0,10);
-    return `<button type="button" class="secondary small" onclick="selecionarDiaSemanaAdmin('${iso}')">${nome}<br><small>${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}</small></button>`;
-  }).join("");
-  selecionarDiaSemanaAdmin(base.toISOString().slice(0,10));
-};
-
-window.selecionarDiaSemanaAdmin = function (data) {
-  const input = document.getElementById("adminDataHorario");
-  if (input) input.value = data;
-  atualizarHorariosEmLote();
+window.adminExcluirHorarioAvulso = async function (id, data, horario) {
+  if (!confirm(`Apagar o horário ${horario} do dia ${String(data).split("-").reverse().join("/")}?`)) return;
+  const client = adminClient();
+  const { data: ags, error: agError } = await client
+    .from("agendamentos")
+    .select("id,status")
+    .eq("data", data)
+    .eq("horario", horario)
+    .in("status", ["confirmado", "agendado", "pendente"]);
+  if (agError) return alert("Não foi possível verificar se esse horário está agendado.");
+  if ((ags || []).length) return alert("Esse horário já está agendado e não pode ser apagado.");
+  const { error } = await client.from("horarios").delete().eq("id", Number(id));
+  if (error) return alert("Não foi possível apagar esse horário.");
+  await renderAdminHorarios();
 };
 
 async function renderAdminHorarios() {
   const conteudo = document.getElementById("adminConteudo");
   if (!conteudo) return;
   conteudo.innerHTML = `<h3>📅 Horários</h3>
-    <p>Escolha a semana e depois o dia. Assim você vê e atualiza os horários de segunda a sábado sem precisar procurar data por data.</p>
+    <p>Escolha uma data. Os horários padrão aparecem automaticamente e você pode editar cada um antes de salvar.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end;">
-      <label>Semana de<input id="adminSemanaHorario" type="date" onchange="montarDiasDaSemanaAdmin()"></label>
-      <label>Horário avulso<input id="adminHoraHorario" type="time" min="00:00" max="23:59"></label>
+      <label>Data<input id="adminDataHorario" type="date" onchange="atualizarHorariosEmLote()"></label>
+      <label>Horário<input id="adminHoraHorario" type="time" min="00:00" max="23:59"></label>
       <button class="secondary small" onclick="adminAdicionarHorario()">Adicionar horário avulso</button>
     </div>
-    <div id="adminDiasSemana" style="display:flex;gap:7px;flex-wrap:wrap;margin:12px 0;"></div>
-    <input id="adminDataHorario" type="hidden">
     <div id="adminHorariosLote"></div>
     <div id="listaHorariosAdmin" style="margin-top:18px">Carregando...</div>`;
-  const hojeSemana = new Date();
-  const diff = (hojeSemana.getDay() || 7) - 1;
-  hojeSemana.setDate(hojeSemana.getDate() - diff);
-  document.getElementById("adminSemanaHorario").value = hojeSemana.toISOString().slice(0,10);
-  montarDiasDaSemanaAdmin();
   const client = adminClient();
   const { data, error } = await client.from("horarios").select("id,data,horario,disponivel,restricao").order("data").order("horario");
   if (error) { document.getElementById("listaHorariosAdmin").textContent = "Não foi possível carregar os horários."; return; }
+
+  // Mostra também quando um horário foi efetivamente ocupado por uma cliente.
+  const datas = [...new Set((data || []).map(r => r.data).filter(Boolean))];
+  const ocupados = new Set();
+  for (const dia of datas) {
+    const { data: ags } = await client
+      .from("agendamentos")
+      .select("data,horario,status")
+      .eq("data", dia)
+      .in("status", ["confirmado", "agendado", "pendente"]);
+    (ags || []).forEach(a => ocupados.add(`${a.data}|${String(a.horario).slice(0,5)}`));
+  }
+
   document.getElementById("listaHorariosAdmin").innerHTML = (data || []).map(r => {
-    const hora = String(r.horario).slice(0,5);
-    const avulso = !HORARIOS_PADRAO.includes(hora);
+    const chave = `${r.data}|${String(r.horario).slice(0,5)}`;
+    const agendado = ocupados.has(chave);
+    const statusTexto = agendado ? "Agendado" : (r.disponivel ? (r.restricao === "curto" ? "Só Manicure/Pedicure" : "Disponível") : "Indisponível");
     return `
-    <div style="display:flex;justify-content:space-between;gap:10px;padding:10px;border-bottom:1px solid #eee;align-items:center;">
-      <span>${r.data} — ${hora} — ${r.disponivel ? (r.restricao === "curto" ? "Só Manicure/Pedicure" : "Disponível") : "Indisponível"}${avulso ? " — Avulso" : ""}</span>
-      <div style="display:flex;gap:6px;align-items:center;">
-        <button class="primary small" onclick="adminAlterarHorario(${r.id}, ${r.disponivel})">${r.disponivel ? "Bloquear" : "Liberar"}</button>
-        ${avulso ? `<button class="secondary small" title="Apagar horário avulso" onclick="adminExcluirHorarioAvulso(${r.id})">✕</button>` : ""}
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px;border-bottom:1px solid #eee;">
+      <span>${r.data} — ${String(r.horario).slice(0,5)} — ${statusTexto}</span>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        ${agendado ? `<span style="opacity:.7">🔒</span>` : `<button class="primary small" onclick="adminAlterarHorario(${r.id}, ${r.disponivel})">${r.disponivel ? "Bloquear" : "Liberar"}</button>`}
+        ${agendado ? "" : `<button type="button" class="secondary small" onclick="adminExcluirHorarioAvulso(${r.id}, '${String(r.data).replace(/'/g,"\'")}', '${String(r.horario).slice(0,5)}')" title="Apagar este horário">✕</button>`}
       </div>
     </div>`;
   }).join("") || "Nenhum horário cadastrado ainda.";
@@ -2297,16 +2283,16 @@ window.adminNovoAgendamento = async function (clienteSelecionadoId = null) {
       </label>
       <button class="secondary full" onclick="adminNovoCadastroParaAgendamento()">➕ Novo cadastro</button>
       <label style="display:block;margin:10px 0;">Serviço
-        <select id="adminAgServico" style="width:100%;padding:10px;" onchange="carregarHorariosAdminNovoAgendamento()">
+        <select id="adminAgServico" style="width:100%;padding:10px;" onchange="carregarHorariosAgendamentoAdmin()">
           <option value="">Selecione o serviço</option>
           ${SERVICES.map(s => `<option value="${escapeHtml(s[0])}">${escapeHtml(s[0])} — ${money(precoAtualServico(s[0]))}</option>`).join("")}
         </select>
       </label>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <label>Data<input id="adminAgData" type="date" min="${hoje}" style="width:100%;padding:10px;" onchange="carregarHorariosAdminNovoAgendamento()"></label>
-        <label>Horário<select id="adminAgHora" style="width:100%;padding:10px;" disabled><option value="">Escolha primeiro o serviço e a data</option></select></label>
+        <label>Data<input id="adminAgData" type="date" min="${hoje}" style="width:100%;padding:10px;" onchange="carregarHorariosAgendamentoAdmin()"></label>
+        <label>Horário<select id="adminAgHora" style="width:100%;padding:10px;" disabled onchange="atualizarRestricaoAgendamentoAdmin()"><option value="">Escolha a data e o procedimento</option></select></label>
       </div>
-      <p id="adminAgHoraStatus" class="muted" style="margin:4px 0 10px;"></p>
+      <p id="adminAgRestricao" class="muted" style="min-height:20px;margin:4px 0 10px;"></p>
       <label style="display:block;margin:10px 0;">Forma de pagamento
         <select id="adminAgPagamento" style="width:100%;padding:10px;" onchange="adminAtualizarPagarDepois()">
           <option value="pix">Pix</option>
@@ -2362,72 +2348,73 @@ window.adminSalvarNovoCadastro = async function () {
   await adminNovoAgendamento(novoId);
 };
 
-window.carregarHorariosAdminNovoAgendamento = async function () {
-  const data = document.getElementById("adminAgData")?.value;
-  const servico = document.getElementById("adminAgServico")?.value;
-  const select = document.getElementById("adminAgHora");
-  const status = document.getElementById("adminAgHoraStatus");
-  if (!select) return;
-  select.innerHTML = `<option value="">Carregando horários...</option>`;
-  select.disabled = true;
-  if (status) status.textContent = "";
-  if (!data || !servico) {
-    select.innerHTML = `<option value="">Escolha primeiro o serviço e a data</option>`;
-    return;
-  }
-
-  const client = adminClient();
-  const [{ data: horarios, error: hError }, { data: agendados, error: aError }] = await Promise.all([
-    client.from("horarios").select("horario,disponivel,restricao").eq("data", data).order("horario"),
-    client.rpc("horarios_ocupados_publicos", { data_busca: data })
-  ]);
-  if (hError || aError) {
-    console.error(hError || aError);
-    select.innerHTML = `<option value="">Não foi possível verificar a disponibilidade</option>`;
-    if (status) status.textContent = "A disponibilidade não pôde ser confirmada agora.";
-    return;
-  }
-
-  const duracaoTotal = duracaoServicoMinutos(servico);
-  const [y,m,d] = data.split("-").map(Number);
-  const diaSemana = new Date(y, m - 1, d).getDay();
-  const padrao = diaSemana >= 1 && diaSemana <= 6 ? HORARIOS_PADRAO : [];
-  const configs = horarios || [];
-  const pontos = [...new Set([...padrao, ...configs.map(r => String(r.horario || "").slice(0,5)).filter(Boolean)])];
-  const minutos = pontos.map(horaParaMinutos).filter(Number.isFinite);
-  let candidatos = [];
-  if (minutos.length) {
-    const inicio = Math.min(...minutos), fim = Math.max(...minutos);
-    for (let t = inicio; t <= fim; t += 60) candidatos.push(minutosParaHora(t));
-    candidatos = [...new Set([...candidatos, ...pontos])];
-  }
-  const cfgMap = new Map(configs.map(r => [String(r.horario || "").slice(0,5), r]));
-  const bloqueados = new Set(configs.filter(r => r.disponivel === false).map(r => String(r.horario || "").slice(0,5)));
-  const ativos = (agendados || []).filter(a => !["cancelado","realizado","falta"].includes(String(a.status || "").toLowerCase()));
-  const ocupados = ativos.map(a => ({ inicio: horaParaMinutos(a.horario), fim: horaParaMinutos(a.horario) + duracaoServicoMinutos(a.servico) }));
-
-  const disponiveis = candidatos.filter(h => {
-    const cfg = cfgMap.get(h);
-    if (bloqueados.has(h)) return false;
-    if (cfg?.restricao === "curto" && !restricaoPermiteServico("curto", servico)) return false;
-    const inicio = horaParaMinutos(h), fim = inicio + duracaoTotal;
-    return !ocupados.some(o => inicio < o.fim && fim > o.inicio);
-  });
-
-  if (!disponiveis.length) {
-    select.innerHTML = `<option value="">Nenhum horário disponível</option>`;
-    if (status) status.textContent = `Não há horário disponível para ${formatarDuracao(duracaoTotal)} nesta data.`;
-    return;
-  }
-  select.disabled = false;
-  select.innerHTML = `<option value="">Escolha um horário disponível</option>` + disponiveis.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)} — ${formatarDuracao(duracaoTotal)}</option>`).join("");
-  if (status) status.textContent = `Mostrando somente horários disponíveis para ${formatarDuracao(duracaoTotal)}.`;
-};
-
 window.adminAtualizarPagarDepois = function () {
   const pagamento = document.getElementById("adminAgPagamento")?.value;
   const box = document.getElementById("adminAgPagarAteBox");
   if (box) box.style.display = pagamento === "pagar_depois" ? "block" : "none";
+};
+
+window.atualizarRestricaoAgendamentoAdmin = function () {
+  const date = document.getElementById("adminAgData")?.value;
+  const time = document.getElementById("adminAgHora")?.value;
+  const box = document.getElementById("adminAgRestricao");
+  if (!box) return;
+  const cfg = (window.__adminHorariosAgendamento || []).find(r => String(r.horario).slice(0,5) === String(time).slice(0,5));
+  box.textContent = cfg?.restricao === "curto" ? "💗 Este horário é somente para Manicure e Pedicure." : "";
+};
+
+window.carregarHorariosAgendamentoAdmin = async function () {
+  const date = document.getElementById("adminAgData")?.value;
+  const servico = document.getElementById("adminAgServico")?.value;
+  const select = document.getElementById("adminAgHora");
+  if (!select) return;
+  select.innerHTML = `<option value="">Carregando...</option>`;
+  select.disabled = true;
+  if (!date || !servico) {
+    select.innerHTML = `<option value="">Escolha a data e o procedimento</option>`;
+    return;
+  }
+  const client = adminClient();
+  const { data: horarios, error } = await client
+    .from("horarios")
+    .select("horario,disponivel,restricao")
+    .eq("data", date)
+    .order("horario");
+  if (error) {
+    console.error(error);
+    select.innerHTML = `<option value="">Não foi possível carregar</option>`;
+    return;
+  }
+  const { data: agendados, error: agError } = await client.rpc("horarios_ocupados_publicos", { data_busca: date });
+  if (agError) {
+    console.error(agError);
+    select.innerHTML = `<option value="">Não foi possível verificar a disponibilidade</option>`;
+    return;
+  }
+  window.__adminHorariosAgendamento = horarios || [];
+  const ocupados = (agendados || []).filter(a => !["cancelado","realizado","falta"].includes(String(a.status || "").toLowerCase()));
+  const intervalos = ocupados.map(a => ({inicio: horaParaMinutos(a.horario), fim: horaParaMinutos(a.horario) + duracaoServicoMinutos(a.servico)}));
+  const duracao = duracaoServicoMinutos(servico);
+  const disponiveis = (horarios || []).filter(r => r.disponivel !== false).filter(r => {
+    const h = String(r.horario).slice(0,5);
+    const ini = horaParaMinutos(h);
+    const fim = ini + duracao;
+    if (!Number.isFinite(ini)) return false;
+    if (r.restricao === "curto" && (duracao > 60 || !restricaoPermiteServico("curto", servico))) return false;
+    return !intervalos.some(o => ini < o.fim && fim > o.inicio);
+  });
+  if (!disponiveis.length) {
+    select.innerHTML = `<option value="">Nenhum horário disponível</option>`;
+    atualizarRestricaoAgendamentoAdmin();
+    return;
+  }
+  select.disabled = false;
+  select.innerHTML = `<option value="">Escolha um horário</option>` + disponiveis.map(r => {
+    const h = String(r.horario).slice(0,5);
+    const texto = r.restricao === "curto" ? `${h} — somente Manicure/Pedicure` : h;
+    return `<option value="${escapeHtml(h)}">${escapeHtml(texto)}</option>`;
+  }).join("");
+  atualizarRestricaoAgendamentoAdmin();
 };
 
 window.adminSalvarNovoAgendamento = async function () {
