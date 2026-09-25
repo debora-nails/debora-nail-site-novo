@@ -168,6 +168,15 @@ function listaServicosDoAgendamento(nome) {
     .filter(Boolean);
 }
 
+function restricaoPermiteServico(restricao, nome) {
+  if (String(restricao || "") !== "curto") return true;
+  return ["Manicure", "Pedicure"].includes(String(nome || "").trim());
+}
+
+function textoRestricaoHorario(restricao) {
+  return String(restricao || "") === "curto" ? "💗 Disponível nesse horário somente para Manicure e Pedicure." : "";
+}
+
 function duracaoServicoMinutos(nome) {
   const partes = listaServicosDoAgendamento(nome);
   if (!partes.length) return 120;
@@ -219,9 +228,9 @@ function detalhesHorariosServicos(servico, horarioInicio) {
 }
 
 function servicosSelecionadosAgendamento() {
-  const primeiro = document.getElementById("bookingService1")?.value || "";
-  const segundo = document.getElementById("bookingService2")?.value || "";
-  return [primeiro, segundo].filter(Boolean);
+  return [...document.querySelectorAll('input[name="bookingServices"]:checked')]
+    .map(input => input.value)
+    .filter(Boolean);
 }
 
 function atualizarResumoServicosAgendamento() {
@@ -235,6 +244,48 @@ function atualizarResumoServicosAgendamento() {
       : "Selecione pelo menos um procedimento.";
   }
   carregarHorariosDisponiveis();
+}
+
+function atualizarOpcoesDeHorarioPorProcedimentos() {
+  const select = document.getElementById("bookingTime");
+  if (!select) return;
+  const selecionados = servicosSelecionadosAgendamento();
+  const duracaoTotal = selecionados.reduce((total, nome) => total + duracaoServicoMinutos(nome), 0);
+  [...select.options].forEach(option => {
+    if (!option.value) return;
+    const cfg = window.__horariosConfiguradosAgendamento?.find(r => String(r.horario || "").slice(0,5) === String(option.value).slice(0,5));
+    const restricao = cfg?.restricao || "";
+    const somenteCurtos = restricao === "curto";
+    const incompatível = somenteCurtos && selecionados.length > 0 && (duracaoTotal > 60 || !selecionados.every(nome => restricaoPermiteServico("curto", nome)));
+    option.disabled = incompatível;
+    const base = String(option.value).slice(0,5);
+    option.textContent = somenteCurtos ? `${base} — somente Manicure/Pedicure` : `${base} — ${formatarDuracao(duracaoTotal || 0)}`;
+  });
+  if (select.selectedOptions[0]?.disabled) {
+    select.value = "";
+    atualizarRestricaoDoHorario();
+  }
+}
+
+function atualizarRestricaoDoHorario() {
+  const date = document.getElementById("bookingDate")?.value;
+  const time = document.getElementById("bookingTime")?.value;
+  const notice = document.getElementById("bookingRestrictionNotice");
+  if (!notice) return;
+  let restricao = "";
+  if (date && time) {
+    const cfg = window.__horariosConfiguradosAgendamento?.find(r => String(r.horario || "").slice(0,5) === String(time).slice(0,5));
+    restricao = cfg?.restricao || "";
+  }
+  notice.textContent = textoRestricaoHorario(restricao);
+  notice.style.display = restricao === "curto" ? "block" : "none";
+  document.querySelectorAll('input[name="bookingServices"]').forEach(input => {
+    const permitido = restricao !== "curto" || restricaoPermiteServico("curto", input.value);
+    input.disabled = !permitido;
+    const label = input.closest("label");
+    if (label) label.style.opacity = permitido ? "1" : ".45";
+    if (!permitido) input.checked = false;
+  });
 }
 
 function renderServices() {
@@ -361,7 +412,7 @@ async function carregarHorariosDisponiveis() {
   const client = adminClient();
   const { data: horarios, error } = await client
     .from("horarios")
-    .select("horario,disponivel")
+    .select("horario,disponivel,restricao")
     .eq("data", date)
     .order("horario");
   if (error) {
@@ -381,6 +432,8 @@ async function carregarHorariosDisponiveis() {
   const [y,m,d] = date.split("-").map(Number);
   const diaSemana = new Date(y, m - 1, d).getDay();
   const horarioPadraoDoDia = diaSemana >= 1 && diaSemana <= 6 ? HORARIOS_PADRAO : [];
+  const horarioConfigPorHora = new Map((horarios || []).map(item => [String(item.horario || "").slice(0,5), item]));
+  window.__horariosConfiguradosAgendamento = horarios || [];
   const bloqueados = new Set((horarios || [])
     .filter(item => item.disponivel === false)
     .map(item => String(item.horario || "").slice(0,5)));
@@ -426,6 +479,8 @@ async function carregarHorariosDisponiveis() {
     `<option value="">Escolha um horário</option>` +
     disponiveis.map(item => `<option value="${item.hora}">${item.hora} — ${formatarDuracao(duracaoTotal)}</option>`).join("");
   if (status) status.textContent = `Tempo total: ${formatarDuracao(duracaoTotal)}. O próximo horário será liberado automaticamente depois do término.`;
+  atualizarRestricaoDoHorario();
+  atualizarOpcoesDeHorarioPorProcedimentos();
 }
 
 async function openBooking(index = null) {
@@ -449,32 +504,16 @@ async function openBooking(index = null) {
 
     <div>
       <strong>Procedimentos</strong>
-      <p class="muted" style="margin:4px 0 8px;">Escolha o procedimento principal e, se quiser, um segundo procedimento. O segundo é opcional e o site soma automaticamente o tempo.</p>
-
-      <label>
-        Procedimento 1
-        <select id="bookingService1" onchange="atualizarResumoServicosAgendamento()">
-          <option value="">Selecione</option>
-          ${SERVICES.map((service, number) => `
-            <option value="${escapeHtml(service[0])}" ${number === index ? "selected" : ""}>
-              ${escapeHtml(service[0])} — ${money(precoAtualServico(service[0]))}
-            </option>
-          `).join("")}
-        </select>
-      </label>
-
-      <label>
-        Procedimento 2 <span class="muted">(opcional)</span>
-        <select id="bookingService2" onchange="atualizarResumoServicosAgendamento()">
-          <option value="">Nenhum</option>
-          ${SERVICES.map(service => `
-            <option value="${escapeHtml(service[0])}">
-              ${escapeHtml(service[0])} — ${money(precoAtualServico(service[0]))}
-            </option>
-          `).join("")}
-        </select>
-      </label>
-
+      <div id="bookingRestrictionNotice" style="display:none;margin:7px 0;padding:9px;border-radius:10px;background:#fff1f6;border:1px solid #ead7df;"></div>
+      <p class="muted" style="margin:4px 0 8px;">Você pode escolher mais de um procedimento no mesmo agendamento. O site soma automaticamente o tempo.</p>
+      <div id="bookingServicesList" style="display:grid;gap:7px;">
+        ${SERVICES.map((service, number) => `
+          <label style="display:flex;align-items:center;gap:9px;padding:9px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;">
+            <input type="checkbox" name="bookingServices" value="${escapeHtml(service[0])}" ${number === index ? "checked" : ""} onchange="atualizarResumoServicosAgendamento()">
+            <span>${escapeHtml(service[0])} — ${money(precoAtualServico(service[0]))} <small style="opacity:.7">(${formatarDuracao(duracaoServicoMinutos(service[0]))})</small></span>
+          </label>
+        `).join("")}
+      </div>
       <div id="bookingServicesSummary" class="muted" style="margin-top:9px;padding:9px;border-radius:10px;background:#f8edf3;">Selecione pelo menos um procedimento.</div>
     </div>
 
@@ -485,7 +524,7 @@ async function openBooking(index = null) {
 
     <label>
       Horário
-      <select id="bookingTime" disabled>
+      <select id="bookingTime" disabled onchange="atualizarRestricaoDoHorario()">
         <option value="">Selecione uma data primeiro</option>
       </select>
     </label>
@@ -535,6 +574,7 @@ async function openBooking(index = null) {
   `);
   atualizarOpcaoEncaixe();
   atualizarResumoServicosAgendamento();
+  atualizarRestricaoDoHorario();
 
   await atualizarOpcaoPagarDepoisAgendamento();
   atualizarPagamentoAgendamento();
@@ -684,8 +724,7 @@ function atualizarOpcaoEncaixe() {
 }
 
 function solicitarEncaixeWhatsApp() {
-  const selecionados = servicosSelecionadosAgendamento();
-  const service = selecionados.join(" + ") || "um atendimento";
+  const service = document.getElementById("bookingService")?.value || "um atendimento";
   const date = document.getElementById("bookingDate")?.value || "";
   const dataFormatada = date ? date.split("-").reverse().join("/") : "";
   const message = `Olá, Débora! 💗 Gostaria de solicitar um encaixe para ${service}${dataFormatada ? ` no dia ${dataFormatada}` : ""}. Se houver algum horário disponível, por favor me avise. 💅✨`;
@@ -1240,7 +1279,7 @@ async function atualizarHorariosEmLote() {
   const client = adminClient();
   const { data: existentes, error } = await client
     .from("horarios")
-    .select("id,data,horario,disponivel")
+    .select("id,data,horario,disponivel,restricao")
     .eq("data", data)
     .order("horario");
 
@@ -1265,14 +1304,16 @@ async function atualizarHorariosEmLote() {
       linhas.push({
         id: existente.id,
         horario,
-        disponivel: !!existente.disponivel
+        disponivel: !!existente.disponivel,
+        restricao: existente.restricao || ""
       });
       adicionados.add(horario);
     } else {
       linhas.push({
         id: null,
         horario,
-        disponivel: true
+        disponivel: true,
+        restricao: ""
       });
     }
   }
@@ -1284,7 +1325,8 @@ async function atualizarHorariosEmLote() {
     linhas.push({
       id: r.id,
       horario,
-      disponivel: !!r.disponivel
+      disponivel: !!r.disponivel,
+      restricao: r.restricao || ""
     });
   }
 
@@ -1317,6 +1359,10 @@ async function atualizarHorariosEmLote() {
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;">
             <input type="checkbox" class="adminHorarioEditarDisponivel" data-id="${r.id ?? ''}" ${r.disponivel ? "checked" : ""}>
             <input type="time" class="adminHorarioEditarHora" value="${r.horario}" min="00:00" max="23:59" style="max-width:125px;">
+            <select class="adminHorarioEditarRestricao" style="max-width:210px;">
+              <option value="" ${!r.restricao ? "selected" : ""}>Qualquer procedimento</option>
+              <option value="curto" ${r.restricao === "curto" ? "selected" : ""}>Somente Manicure/Pedicure</option>
+            </select>
             <span class="adminHorarioEditarStatus" style="opacity:.7">${r.disponivel ? "Disponível" : "Indisponível"}</span>
             ${ocupados.has(r.horario) ? `<span style="font-size:.86em;opacity:.7">🔒 Agendado</span>` : `<button type="button" class="secondary small adminHorarioExcluirLinha" title="Remover este horário">✕</button>`}
           </div>`).join("")}
@@ -1337,7 +1383,7 @@ window.adminAdicionarLinhaHorario = function () {
   if (!box) return;
   const row = document.createElement('div');
   row.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;';
-  row.innerHTML = `<input type="checkbox" class="adminHorarioEditarDisponivel" checked><input type="time" class="adminHorarioEditarHora" value="18:00" min="00:00" max="23:59" style="max-width:125px;"><span class="adminHorarioEditarStatus" style="opacity:.7">Disponível</span><button type="button" class="secondary small adminHorarioExcluirLinha" title="Remover este horário">✕</button>`;
+  row.innerHTML = `<input type="checkbox" class="adminHorarioEditarDisponivel" checked><input type="time" class="adminHorarioEditarHora" value="18:00" min="00:00" max="23:59" style="max-width:125px;"><select class="adminHorarioEditarRestricao" style="max-width:210px;"><option value="" selected>Qualquer procedimento</option><option value="curto">Somente Manicure/Pedicure</option></select><span class="adminHorarioEditarStatus" style="opacity:.7">Disponível</span><button type="button" class="secondary small adminHorarioExcluirLinha" title="Remover este horário">✕</button>`;
   row.querySelector('.adminHorarioExcluirLinha')?.addEventListener('click', () => row.remove());
   box.appendChild(row);
 };
@@ -1374,11 +1420,12 @@ window.adminSalvarHorariosEditados = async function () {
 
       const id = check?.dataset.id ? Number(check.dataset.id) : null;
       const disponivel = !!check?.checked;
+      const restricao = row.querySelector(".adminHorarioEditarRestricao")?.value || "";
 
       if (id) {
         const { error } = await client
           .from("horarios")
-          .update({ horario, disponivel })
+          .update({ horario, disponivel, restricao })
           .eq("id", id)
           .eq("data", data);
         if (error) throw error;
@@ -1386,7 +1433,7 @@ window.adminSalvarHorariosEditados = async function () {
       } else {
         const { data: inserido, error } = await client
           .from("horarios")
-          .upsert({ data, horario, disponivel }, { onConflict: "data,horario" })
+          .upsert({ data, horario, disponivel, restricao }, { onConflict: "data,horario" })
           .select("id")
           .single();
         if (error) throw error;
@@ -1459,11 +1506,11 @@ async function renderAdminHorarios() {
     <div id="adminHorariosLote"></div>
     <div id="listaHorariosAdmin" style="margin-top:18px">Carregando...</div>`;
   const client = adminClient();
-  const { data, error } = await client.from("horarios").select("id,data,horario,disponivel").order("data").order("horario");
+  const { data, error } = await client.from("horarios").select("id,data,horario,disponivel,restricao").order("data").order("horario");
   if (error) { document.getElementById("listaHorariosAdmin").textContent = "Não foi possível carregar os horários."; return; }
   document.getElementById("listaHorariosAdmin").innerHTML = (data || []).map(r => `
     <div style="display:flex;justify-content:space-between;gap:10px;padding:10px;border-bottom:1px solid #eee;">
-      <span>${r.data} — ${String(r.horario).slice(0,5)} — ${r.disponivel ? "Disponível" : "Indisponível"}</span>
+      <span>${r.data} — ${String(r.horario).slice(0,5)} — ${r.disponivel ? (r.restricao === "curto" ? "Só Manicure/Pedicure" : "Disponível") : "Indisponível"}</span>
       <button class="primary small" onclick="adminAlterarHorario(${r.id}, ${r.disponivel})">${r.disponivel ? "Bloquear" : "Liberar"}</button>
     </div>`).join("") || "Nenhum horário cadastrado ainda.";
 }
