@@ -306,7 +306,6 @@ function atualizarRestricaoDoHorario() {
     if (select.value && select.options[select.selectedIndex]?.disabled) select.value = "";
   });
   atualizarSegundoProcedimentoAgendamento();
-  atualizarResumoServicosAgendamento();
 }
 
 function renderServices() {
