@@ -156,7 +156,29 @@ const money = value =>
     currency: "BRL"
   });
 
+const DURACAO_SERVICO_MINUTOS = {
+  "Manicure": 60,
+  "Pedicure": 60
+};
+
+function listaServicosDoAgendamento(nome) {
+  return String(nome || "")
+    .split("+")
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+function duracaoServicoMinutos(nome) {
+  const partes = listaServicosDoAgendamento(nome);
+  if (!partes.length) return 120;
+  return partes.reduce((total, servico) => total + Number(DURACAO_SERVICO_MINUTOS[servico] || 120), 0);
+}
+
 function precoAtualServico(nome) {
+  const partes = listaServicosDoAgendamento(nome);
+  if (partes.length > 1) {
+    return partes.reduce((total, servico) => total + precoAtualServico(servico), 0);
+  }
   const base = SERVICES.find(s => String(s[0]).trim().toLowerCase() === String(nome).trim().toLowerCase());
   const precoBase = Number(base?.[1] || 0);
   const promo = PROMOCOES_ATIVAS.find(p =>
@@ -164,6 +186,55 @@ function precoAtualServico(nome) {
   );
   const precoPromo = Number(promo?.preco_promocional);
   return Number.isFinite(precoPromo) && precoPromo >= 0 && precoPromo < precoBase ? precoPromo : precoBase;
+}
+
+function formatarDuracao(minutos) {
+  const horas = Math.floor(Number(minutos || 0) / 60);
+  const minutosRestantes = Number(minutos || 0) % 60;
+  if (!minutosRestantes) return `${horas}h`;
+  return `${horas}h ${minutosRestantes}min`;
+}
+
+function horaParaMinutos(hora) {
+  const [h, m] = String(hora || "").slice(0,5).split(":").map(Number);
+  return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : NaN;
+}
+
+function minutosParaHora(minutos) {
+  const total = Number(minutos);
+  if (!Number.isFinite(total)) return "";
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+}
+
+function detalhesHorariosServicos(servico, horarioInicio) {
+  let atual = horaParaMinutos(horarioInicio);
+  return listaServicosDoAgendamento(servico).map(nome => {
+    const inicio = atual;
+    const fim = atual + duracaoServicoMinutos(nome);
+    atual = fim;
+    return { nome, inicio: minutosParaHora(inicio), fim: minutosParaHora(fim) };
+  });
+}
+
+function servicosSelecionadosAgendamento() {
+  const primeiro = document.getElementById("bookingService1")?.value || "";
+  const segundo = document.getElementById("bookingService2")?.value || "";
+  return [primeiro, segundo].filter(Boolean);
+}
+
+function atualizarResumoServicosAgendamento() {
+  const selecionados = servicosSelecionadosAgendamento();
+  const box = document.getElementById("bookingServicesSummary");
+  const totalMinutos = selecionados.reduce((total, nome) => total + duracaoServicoMinutos(nome), 0);
+  const totalValor = selecionados.reduce((total, nome) => total + precoAtualServico(nome), 0);
+  if (box) {
+    box.innerHTML = selecionados.length
+      ? `<strong>${selecionados.length} procedimento(s)</strong> · ${formatarDuracao(totalMinutos)} · ${money(totalValor)}`
+      : "Selecione pelo menos um procedimento.";
+  }
+  carregarHorariosDisponiveis();
 }
 
 function renderServices() {
@@ -278,33 +349,28 @@ async function carregarHorariosDisponiveis() {
   select.innerHTML = `<option value="">Selecione uma data primeiro</option>`;
   select.disabled = true;
   if (status) status.textContent = "";
-
   if (!date) return;
 
+  const selecionados = servicosSelecionadosAgendamento();
+  if (!selecionados.length) {
+    if (status) status.textContent = "Escolha os procedimentos primeiro.";
+    return;
+  }
+  const duracaoTotal = selecionados.reduce((total, nome) => total + duracaoServicoMinutos(nome), 0);
+
   const client = adminClient();
-  // Carregamos TODOS os horários da data, inclusive os bloqueados.
-  // Isso é importante: se houver apenas um horário salvo como indisponível,
-  // não podemos interpretar a data como se nunca tivesse sido configurada.
   const { data: horarios, error } = await client
     .from("horarios")
     .select("horario,disponivel")
     .eq("data", date)
     .order("horario");
-
   if (error) {
     console.error(error);
     select.innerHTML = `<option value="">Não foi possível carregar os horários</option>`;
     return;
   }
 
-  // As clientes não podem consultar diretamente os agendamentos de outras clientes
-  // por causa das regras de segurança (RLS). A consulta direta pode retornar
-  // vazia mesmo existindo reservas. Usamos uma função pública que retorna
-  // SOMENTE os horários ocupados, sem expor nome, WhatsApp ou qualquer dado da cliente.
-  const { data: agendados, error: agError } = await client.rpc("horarios_ocupados_publicos", {
-    data_busca: date
-  });
-
+  const { data: agendados, error: agError } = await client.rpc("horarios_ocupados_publicos", { data_busca: date });
   if (agError) {
     console.error("Erro ao verificar horários ocupados:", agError);
     select.innerHTML = `<option value="">Não foi possível verificar os horários. Tente novamente.</option>`;
@@ -312,43 +378,54 @@ async function carregarHorariosDisponiveis() {
     return;
   }
 
-  // Só usamos os horários padrão quando a data realmente não possui nenhuma
-  // configuração salva. Um horário bloqueado continua bloqueado após atualizar.
-  let horariosBase = horarios || [];
-  if (!horariosBase.length) {
-    const [y,m,d] = date.split("-").map(Number);
-    const diaSemana = new Date(y, m - 1, d).getDay();
-    if (diaSemana >= 1 && diaSemana <= 6) {
-      horariosBase = HORARIOS_PADRAO.map(horario => ({ horario, disponivel: true }));
-    }
+  const [y,m,d] = date.split("-").map(Number);
+  const diaSemana = new Date(y, m - 1, d).getDay();
+  const horarioPadraoDoDia = diaSemana >= 1 && diaSemana <= 6 ? HORARIOS_PADRAO : [];
+  const bloqueados = new Set((horarios || [])
+    .filter(item => item.disponivel === false)
+    .map(item => String(item.horario || "").slice(0,5)));
+
+  // A agenda continua respeitando a jornada padrão de segunda a sábado,
+  // mas agora cria também os horários de 1 em 1 hora entre o início e o fim.
+  // Assim, depois de um serviço de 1h às 07:00, 08:00 pode ser oferecido.
+  const horariosConfigurados = (horarios || []).map(item => String(item.horario || "").slice(0,5)).filter(Boolean);
+  const pontosDeInicio = [...new Set([...horarioPadraoDoDia, ...horariosConfigurados])];
+  const minutosPontos = pontosDeInicio.map(horaParaMinutos).filter(Number.isFinite);
+  let candidatos = [];
+  if (minutosPontos.length) {
+    const inicio = Math.min(...minutosPontos);
+    const fim = Math.max(...minutosPontos);
+    for (let minuto = inicio; minuto <= fim; minuto += 60) candidatos.push(minutosParaHora(minuto));
+    candidatos = [...new Set([...candidatos, ...pontosDeInicio])];
   }
 
-  // Cancelado, realizado e falta liberam o horário. Qualquer outro status
-  // representa um agendamento que deve bloquear o horário para novas clientes.
-  const ocupados = new Set(
-    (agendados || [])
-      .filter(item => {
-        const s = String(item.status || "").trim().toLowerCase();
-        return !["cancelado", "realizado", "falta"].includes(s);
-      })
-      .map(item => String(item.horario || "").slice(0,5))
-      .filter(Boolean)
-  );
+  const agendamentosAtivos = (agendados || []).filter(item => {
+    const s = String(item.status || "").trim().toLowerCase();
+    return !["cancelado", "realizado", "falta"].includes(s);
+  });
 
-  const disponiveis = horariosBase
-    .filter(item => item.disponivel !== false)
-    .filter(item => !ocupados.has(String(item.horario || "").slice(0,5)));
+  const intervalosOcupados = agendamentosAtivos.map(item => {
+    const inicio = horaParaMinutos(item.horario);
+    const fim = inicio + duracaoServicoMinutos(item.servico);
+    return { inicio, fim };
+  }).filter(item => Number.isFinite(item.inicio));
+
+  const disponiveis = candidatos
+    .map(hora => ({ hora, inicio: horaParaMinutos(hora), fim: horaParaMinutos(hora) + duracaoTotal }))
+    .filter(item => !bloqueados.has(item.hora))
+    .filter(item => !intervalosOcupados.some(ocupado => item.inicio < ocupado.fim && item.fim > ocupado.inicio));
 
   if (!disponiveis.length) {
-    select.innerHTML = `<option value="">Nenhum horário disponível nesta data</option>`;
-    if (status) status.textContent = "Escolha outra data ou aguarde novos horários.";
+    select.innerHTML = `<option value="">Nenhum horário disponível para ${formatarDuracao(duracaoTotal)}</option>`;
+    if (status) status.textContent = "Escolha outra data ou outro conjunto de procedimentos.";
     return;
   }
 
   select.disabled = false;
   select.innerHTML =
     `<option value="">Escolha um horário</option>` +
-    disponiveis.map(item => `<option value="${item.horario}">${item.horario}</option>`).join("");
+    disponiveis.map(item => `<option value="${item.hora}">${item.hora} — ${formatarDuracao(duracaoTotal)}</option>`).join("");
+  if (status) status.textContent = `Tempo total: ${formatarDuracao(duracaoTotal)}. O próximo horário será liberado automaticamente depois do término.`;
 }
 
 async function openBooking(index = null) {
@@ -370,16 +447,36 @@ async function openBooking(index = null) {
     <h2>Agendar horário</h2>
     <p class="muted">Escolha o serviço, a data e um dos horários liberados pela Débora.</p>
 
-    <label>
-      Serviço
-      <select id="bookingService">
-        ${SERVICES.map((service, number) => `
-          <option value="${service[0]}" ${number === index ? "selected" : ""}>
-            ${service[0]} — ${money(precoAtualServico(service[0]))}
-          </option>
-        `).join("")}
-      </select>
-    </label>
+    <div>
+      <strong>Procedimentos</strong>
+      <p class="muted" style="margin:4px 0 8px;">Escolha o procedimento principal e, se quiser, um segundo procedimento. O segundo é opcional e o site soma automaticamente o tempo.</p>
+
+      <label>
+        Procedimento 1
+        <select id="bookingService1" onchange="atualizarResumoServicosAgendamento()">
+          <option value="">Selecione</option>
+          ${SERVICES.map((service, number) => `
+            <option value="${escapeHtml(service[0])}" ${number === index ? "selected" : ""}>
+              ${escapeHtml(service[0])} — ${money(precoAtualServico(service[0]))}
+            </option>
+          `).join("")}
+        </select>
+      </label>
+
+      <label>
+        Procedimento 2 <span class="muted">(opcional)</span>
+        <select id="bookingService2" onchange="atualizarResumoServicosAgendamento()">
+          <option value="">Nenhum</option>
+          ${SERVICES.map(service => `
+            <option value="${escapeHtml(service[0])}">
+              ${escapeHtml(service[0])} — ${money(precoAtualServico(service[0]))}
+            </option>
+          `).join("")}
+        </select>
+      </label>
+
+      <div id="bookingServicesSummary" class="muted" style="margin-top:9px;padding:9px;border-radius:10px;background:#f8edf3;">Selecione pelo menos um procedimento.</div>
+    </div>
 
     <label>
       Data
@@ -437,6 +534,7 @@ async function openBooking(index = null) {
     </div>
   `);
   atualizarOpcaoEncaixe();
+  atualizarResumoServicosAgendamento();
 
   await atualizarOpcaoPagarDepoisAgendamento();
   atualizarPagamentoAgendamento();
@@ -471,12 +569,11 @@ function atualizarPagamentoAgendamento() {
 }
 
 function calcularTrocoAgendamento() {
-  const service = document.getElementById("bookingService")?.value;
+  const selecionados = servicosSelecionadosAgendamento();
   const trocoPara = Number(document.getElementById("bookingTrocoPara")?.value || 0);
   const result = document.getElementById("bookingTrocoResultado");
-  const servicoAtual = SERVICES.find(s => s[0] === service);
-  if (!result || !servicoAtual || !trocoPara) { if (result) result.textContent = ""; return; }
-  const valor = precoAtualServico(service);
+  if (!result || !selecionados.length || !trocoPara) { if (result) result.textContent = ""; return; }
+  const valor = selecionados.reduce((total, nome) => total + precoAtualServico(nome), 0);
   if (trocoPara < valor) {
     result.textContent = `O valor informado é menor que o serviço (${money(valor)}).`;
     return;
@@ -485,15 +582,15 @@ function calcularTrocoAgendamento() {
 }
 
 async function confirmarAgendamento() {
-  const service = document.getElementById("bookingService")?.value;
+  const selecionados = servicosSelecionadosAgendamento();
   const date = document.getElementById("bookingDate")?.value;
   const time = document.getElementById("bookingTime")?.value;
   const payment = document.getElementById("bookingPayment")?.value;
   const pagarAte = document.getElementById("bookingPayLaterDate")?.value || null;
   const trocoPara = Number(document.getElementById("bookingTrocoPara")?.value || 0);
 
-  if (!service || !date || !time) {
-    alert("Escolha o serviço, a data e um horário disponível.");
+  if (!selecionados.length || !date || !time) {
+    alert("Escolha pelo menos um procedimento, a data e um horário disponível.");
     return;
   }
   if (!payment) {
@@ -505,8 +602,9 @@ async function confirmarAgendamento() {
     return;
   }
 
-  const servicoAtual = SERVICES.find(s => s[0] === service);
-  const valorServico = precoAtualServico(service);
+  const servico = selecionados.join(" + ");
+  const valorServico = selecionados.reduce((total, nome) => total + precoAtualServico(nome), 0);
+  const duracaoTotal = selecionados.reduce((total, nome) => total + duracaoServicoMinutos(nome), 0);
   let troco = 0;
 
   if (payment === "dinheiro" && trocoPara > 0) {
@@ -518,75 +616,47 @@ async function confirmarAgendamento() {
   }
 
   const { client, cliente } = await getCurrentClient();
-
   if (!cliente) {
     alert("Entre na sua Área VIP para realizar o agendamento.");
     return;
   }
-
   if (payment === "pagar_depois" && !cliente.permite_pagamento_posterior) {
     alert("O pagamento posterior não está liberado para este cadastro.");
     return;
   }
 
-  // Última proteção: antes de gravar, verificamos novamente se o horário
-  // continua livre. Isso evita dupla reserva mesmo se duas clientes abrirem
-  // a tela ao mesmo tempo.
-  const { data: conflitos, error: conflitoError } = await client
-    .from("agendamentos")
-    .select("id,horario,status")
-    .eq("data", date)
-    .eq("horario", time);
-
+  // Última verificação usando todos os agendamentos ativos e a duração de cada um.
+  const { data: conflitos, error: conflitoError } = await client.rpc("horarios_ocupados_publicos", { data_busca: date });
   if (conflitoError) {
     console.error(conflitoError);
     alert("Não foi possível confirmar se esse horário continua livre. Tente novamente.");
     return;
   }
-
+  const inicioNovo = horaParaMinutos(time);
+  const fimNovo = inicioNovo + duracaoTotal;
   const existeConflito = (conflitos || []).some(item => {
-    const s = String(item.status || "").trim().toLowerCase();
-    return !["cancelado", "realizado", "falta"].includes(s);
+    const inicio = horaParaMinutos(item.horario);
+    const fim = inicio + duracaoServicoMinutos(item.servico);
+    return inicioNovo < fim && fimNovo > inicio;
   });
-
   if (existeConflito) {
-    alert("Esse horário já está reservado. Escolha outro horário.");
+    alert("Esse horário ou parte do período já está reservado. Escolha outro horário.");
     await carregarHorariosDisponiveis();
     return;
   }
 
-  // Segunda proteção: verifica novamente o horário imediatamente antes de gravar.
-  const { data: ocupadoAgora, error: ocupadoAgoraError } = await client.rpc("horarios_ocupados_publicos", {
-    data_busca: date
+  const { error } = await client.from("agendamentos").insert({
+    cliente_id: cliente.id,
+    servico,
+    data: date,
+    horario: time,
+    status: "confirmado",
+    forma_pagamento: payment,
+    data_vencimento: payment === "pagar_depois" ? pagarAte : null,
+    troco_para: payment === "dinheiro" && trocoPara ? trocoPara : null,
+    troco: payment === "dinheiro" && trocoPara ? troco : null,
+    pagamento_status: "pendente"
   });
-  if (ocupadoAgoraError) {
-    console.error(ocupadoAgoraError);
-    alert("Não foi possível confirmar se esse horário ainda está livre. Tente novamente.");
-    return;
-  }
-  const horarioJaOcupado = (ocupadoAgora || []).some(item =>
-    String(item.horario).slice(0,5) === String(time).slice(0,5)
-  );
-  if (horarioJaOcupado) {
-    alert("Esse horário já foi reservado. Escolha outro horário.");
-    await carregarHorariosDisponiveis();
-    return;
-  }
-
-  const { error } = await client
-    .from("agendamentos")
-    .insert({
-      cliente_id: cliente.id,
-      servico: service,
-      data: date,
-      horario: time,
-      status: "confirmado",
-      forma_pagamento: payment,
-      data_vencimento: payment === "pagar_depois" ? pagarAte : null,
-      troco_para: payment === "dinheiro" && trocoPara ? trocoPara : null,
-      troco: payment === "dinheiro" && trocoPara ? troco : null,
-      pagamento_status: payment === "pagar_depois" ? "pendente" : "pendente"
-    });
 
   if (error) {
     console.error(error);
@@ -595,16 +665,12 @@ async function confirmarAgendamento() {
       await carregarHorariosDisponiveis();
       return;
     }
-    if (error.code === "42703" || String(error.message || "").toLowerCase().includes("forma_pagamento")) {
-      alert("A parte de pagamento ainda não foi ativada no banco de dados. Rode o SQL de atualização que preparei junto com este código.");
-      return;
-    }
     alert("Não foi possível realizar o agendamento. Tente novamente.");
     return;
   }
 
   closeModal();
-  alert(`Agendamento realizado com sucesso! 💗\n\n${service}\n${date.split("-").reverse().join("/")}\n${time}${payment === "pagar_depois" ? `\nPagar até: ${pagarAte.split("-").reverse().join("/")}` : ""}`);
+  alert(`Agendamento realizado com sucesso! 💗\n\n${selecionados.join(" + ")}\n${date.split("-").reverse().join("/")}\nInício: ${time}\nDuração: ${formatarDuracao(duracaoTotal)}\nTérmino previsto: ${minutosParaHora(fimNovo)}${payment === "pagar_depois" ? `\nPagar até: ${pagarAte.split("-").reverse().join("/")}` : ""}`);
 }
 
 function atualizarOpcaoEncaixe() {
@@ -618,7 +684,8 @@ function atualizarOpcaoEncaixe() {
 }
 
 function solicitarEncaixeWhatsApp() {
-  const service = document.getElementById("bookingService")?.value || "um atendimento";
+  const selecionados = servicosSelecionadosAgendamento();
+  const service = selecionados.join(" + ") || "um atendimento";
   const date = document.getElementById("bookingDate")?.value || "";
   const dataFormatada = date ? date.split("-").reverse().join("/") : "";
   const message = `Olá, Débora! 💗 Gostaria de solicitar um encaixe para ${service}${dataFormatada ? ` no dia ${dataFormatada}` : ""}. Se houver algum horário disponível, por favor me avise. 💅✨`;
@@ -626,22 +693,16 @@ function solicitarEncaixeWhatsApp() {
 }
 
 function abrirWhatsAppAgendamento() {
-  const service = document.getElementById("bookingService")?.value;
+  const selecionados = servicosSelecionadosAgendamento();
   const date = document.getElementById("bookingDate")?.value;
   const time = document.getElementById("bookingTime")?.value;
-
-  if (!service || !date || !time) {
-    alert("Escolha o serviço, a data e um horário antes de continuar pelo WhatsApp.");
+  if (!selecionados.length || !date || !time) {
+    alert("Escolha os procedimentos, a data e um horário antes de continuar pelo WhatsApp.");
     return;
   }
-
-  const message =
-    `Olá, Débora! Gostaria de agendar:\n${service}\nData: ${date}\nHorário: ${time}`;
-
-  window.open(
-    `https://wa.me/5531972084333?text=${encodeURIComponent(message)}`,
-    "_blank"
-  );
+  const duracao = selecionados.reduce((total, nome) => total + duracaoServicoMinutos(nome), 0);
+  const message = `Olá, Débora! Gostaria de agendar:\n${selecionados.join(" + ")}\nData: ${date}\nHorário de início: ${time}\nDuração prevista: ${formatarDuracao(duracao)}\nTérmino previsto: ${minutosParaHora(horaParaMinutos(time) + duracao)}`;
+  window.open(`https://wa.me/5531972084333?text=${encodeURIComponent(message)}`, "_blank");
 }
 
 /* Mantém compatibilidade com qualquer chamada antiga. */
@@ -2093,7 +2154,7 @@ async function renderAdminAgendamentos() {
           const cancelado = status === "cancelado";
           return `<div style="padding:14px;border:1px solid #ead7df;border-radius:16px;margin:10px 0;background:#fff;">
             <strong>📅 ${escapeHtml(dataLabel(a.data))} — ${escapeHtml(diaSemanaLabel(a.data))} — ${escapeHtml(String(a.horario || "").slice(0,5))}</strong>
-            <div style="margin-top:6px;">💅 ${escapeHtml(a.servico || "Serviço não informado")}</div>
+            <div style="margin-top:6px;">💅 ${detalhesHorariosServicos(a.servico || "Serviço não informado", a.horario).map(d => `${escapeHtml(d.nome)} — ${escapeHtml(d.inicio)} às ${escapeHtml(d.fim)}`).join("<br>")}</div>
             <div>👤 ${escapeHtml(nome)}${whatsapp ? ` — ${escapeHtml(whatsapp)}` : ""}</div>
             <div>Status: <strong>${escapeHtml(statusLabel(a.status))}</strong></div>
             <div>Pagamento: ${escapeHtml(pagamento)} — ${escapeHtml(a.pagamento_status || "pendente")}${trocoInfo}${vencimentoInfo}</div>
