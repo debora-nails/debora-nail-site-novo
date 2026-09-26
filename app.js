@@ -2382,16 +2382,38 @@ window.adminSalvarNovoCadastro = async function () {
   const email = document.getElementById("adminNovoEmail")?.value.trim() || null;
   if (!nome) return alert("Digite o nome da cliente.");
   const client = adminClient();
-  const { data, error } = await client.rpc("admin_criar_cliente_manual", {
+  let data = null;
+  let error = null;
+
+  // Primeiro usa a função administrativa já existente.
+  ({ data, error } = await client.rpc("admin_criar_cliente_manual", {
     p_nome: nome,
     p_whatsapp: whatsapp,
     p_email: email
-  });
+  }));
+
+  // Se a função administrativa estiver indisponível, tenta o cadastro direto
+  // com a sessão da Débora, sem alterar clientes já existentes.
+  if (error) {
+    console.warn("admin_criar_cliente_manual falhou; tentando cadastro direto.", error);
+    const direto = await client.from("Clientes").insert({
+      id: Date.now(),
+      nome,
+      whatsapp: whatsapp || "",
+      email: email || "",
+      user_id: null,
+      permite_pagamento_posterior: false
+    }).select("id").single();
+    data = direto.data;
+    error = direto.error;
+  }
+
   if (error) {
     console.error(error);
-    return alert("Não foi possível cadastrar a cliente.");
+    return alert(`Não foi possível cadastrar a cliente.\n\n${error.message || "Erro ao salvar a cliente."}`);
   }
   const novoId = Number(data?.id);
+  if (!novoId) return alert("A cliente foi cadastrada, mas não foi possível continuar o agendamento.");
   closeModal();
   await adminNovoAgendamento(novoId);
 };
@@ -2429,9 +2451,7 @@ window.carregarHorariosAgendamentoAdmin = async function () {
     .eq("data", date)
     .order("horario");
   if (error) {
-    console.error(error);
-    select.innerHTML = `<option value="">Não foi possível carregar</option>`;
-    return;
+    console.warn("Não foi possível ler a tabela de horários; usando os horários padrão.", error);
   }
   const { data: agendados, error: agError } = await client.rpc("horarios_ocupados_publicos", { data_busca: date });
   if (agError) {
@@ -2439,11 +2459,23 @@ window.carregarHorariosAgendamentoAdmin = async function () {
     select.innerHTML = `<option value="">Não foi possível verificar a disponibilidade</option>`;
     return;
   }
-  window.__adminHorariosAgendamento = horarios || [];
+  // Os horários padrão são a base da agenda. Horários extras só entram quando
+  // a Débora os adiciona na tabela "horarios". Se existirem registros para a
+  // data, eles têm prioridade para respeitar bloqueios/restrições.
+  let horariosBase = Array.isArray(horarios) ? horarios : [];
+  if (!horariosBase.length) {
+    const [y,m,d] = date.split("-").map(Number);
+    const diaSemana = new Date(y, m - 1, d).getDay();
+    if (diaSemana >= 1 && diaSemana <= 6) {
+      horariosBase = HORARIOS_PADRAO.map(horario => ({ horario, disponivel: true, restricao: "" }));
+    }
+  }
+
+  window.__adminHorariosAgendamento = horariosBase;
   const ocupados = (agendados || []).filter(a => !["cancelado","realizado","falta"].includes(String(a.status || "").toLowerCase()));
   const intervalos = ocupados.map(a => ({inicio: horaParaMinutos(a.horario), fim: horaParaMinutos(a.horario) + duracaoServicoMinutos(a.servico)}));
   const duracao = duracaoServicoMinutos(servico);
-  const disponiveis = (horarios || []).filter(r => r.disponivel !== false).filter(r => {
+  const disponiveis = horariosBase.filter(r => r.disponivel !== false).filter(r => {
     const h = String(r.horario).slice(0,5);
     const ini = horaParaMinutos(h);
     const fim = ini + duracao;
@@ -2495,7 +2527,7 @@ window.adminSalvarNovoAgendamento = async function () {
     if (String(error.message || "").toLowerCase().includes("pagar depois")) {
       return alert("O pagamento posterior não está liberado para esta cliente.");
     }
-    return alert("Não foi possível realizar o agendamento.");
+    return alert(`Não foi possível realizar o agendamento.\n\n${error.message || "Erro ao salvar o agendamento."}`);
   }
   closeModal();
   await renderAdminAgendamentos();
