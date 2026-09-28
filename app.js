@@ -2295,6 +2295,7 @@ async function renderAdminAgendamentos() {
             </div>` : ""}
             ${podeFechar ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
               <button class="primary small" onclick="adminReagendarAgendamento(${Number(a.id)})">🔄 Reagendar</button>
+              <button class="secondary small" onclick="adminAlterarHorarioManual(${Number(a.id)})">🕐 Alterar horário</button>
               <button class="secondary small" onclick="adminCorrigirProcedimento(${Number(a.id)})">✏️ Corrigir procedimento</button>
               <button class="primary small" onclick="adminMarcarAgendamento(${Number(a.id)},'realizado')">✅ Realizado</button>
               <button class="secondary small" onclick="adminMarcarAgendamento(${Number(a.id)},'faltou')">⚠️ Faltou</button>
@@ -2616,6 +2617,111 @@ window.adminSalvarReagendamento = async function(id) {
   closeModal();
   await renderAdminAgendamentos();
   alert(`Agendamento reagendado com sucesso! 💗\n\n${data.split("-").reverse().join("/")} às ${horario}`);
+};
+
+
+window.adminAlterarHorarioManual = async function(id) {
+  const client = adminClient();
+  const { data: agendamento, error } = await client
+    .from("agendamentos")
+    .select("id,cliente_id,servico,data,horario,status")
+    .eq("id", Number(id))
+    .maybeSingle();
+
+  if (error || !agendamento) {
+    console.error(error);
+    return alert("Não foi possível localizar este agendamento.");
+  }
+
+  const status = String(agendamento.status || "").toLowerCase();
+  if (["cancelado", "faltou", "realizado"].includes(status)) {
+    return alert("Este agendamento não pode mais ter o horário alterado.");
+  }
+
+  const horarioAtual = String(agendamento.horario || "").slice(0,5);
+  showModal(`
+    <h2>🕐 Alterar horário</h2>
+    <p class="muted">
+      ${escapeHtml(agendamento.servico || "Serviço")}<br>
+      ${escapeHtml(agendamento.data || "")} — horário atual: ${escapeHtml(horarioAtual)}
+    </p>
+    <label>Novo horário
+      <input id="adminHorarioManual" type="time" value="${escapeHtml(horarioAtual)}" step="300">
+    </label>
+    <p class="muted">Você pode colocar qualquer horário, mesmo que ele não esteja entre os horários padrão do site.</p>
+    <button class="primary full" onclick="adminSalvarHorarioManual(${Number(agendamento.id)})">SALVAR NOVO HORÁRIO</button>
+    <button class="secondary full" onclick="closeModal()">Voltar</button>
+  `);
+};
+
+window.adminSalvarHorarioManual = async function(id) {
+  const horario = document.getElementById("adminHorarioManual")?.value;
+  if (!horario || !/^\d{2}:\d{2}$/.test(horario)) {
+    return alert("Informe um horário válido.");
+  }
+
+  const client = adminClient();
+  const { data: agendamento, error: buscaError } = await client
+    .from("agendamentos")
+    .select("id,cliente_id,servico,data,horario,status")
+    .eq("id", Number(id))
+    .maybeSingle();
+
+  if (buscaError || !agendamento) {
+    console.error(buscaError);
+    return alert("Não foi possível localizar este agendamento.");
+  }
+
+  const status = String(agendamento.status || "").toLowerCase();
+  if (["cancelado", "faltou", "realizado"].includes(status)) {
+    return alert("Este agendamento não pode mais ter o horário alterado.");
+  }
+
+  const duracaoAlvo = duracaoServicoMinutos(agendamento.servico || "");
+  const inicioAlvo = Number(horario.slice(0,2)) * 60 + Number(horario.slice(3,5));
+  const fimAlvo = inicioAlvo + duracaoAlvo;
+
+  const { data: outros, error: outrosError } = await client
+    .from("agendamentos")
+    .select("id,servico,horario,status")
+    .eq("data", agendamento.data)
+    .in("status", ["confirmado", "agendado", "pendente"])
+    .neq("id", Number(id));
+
+  if (outrosError) {
+    console.error(outrosError);
+    return alert("Não foi possível verificar se esse horário está livre.");
+  }
+
+  const conflito = (outros || []).find(outro => {
+    const inicioOutro = Number(String(outro.horario || "").slice(0,2)) * 60
+      + Number(String(outro.horario || "").slice(3,5));
+    const fimOutro = inicioOutro + duracaoServicoMinutos(outro.servico || "");
+    return inicioAlvo < fimOutro && fimAlvo > inicioOutro;
+  });
+
+  if (conflito) {
+    return alert(
+      `Esse horário entra em conflito com outro atendimento (${String(conflito.horario || "").slice(0,5)}).\\n\\nEscolha outro horário.`
+    );
+  }
+
+  const { error } = await client
+    .from("agendamentos")
+    .update({ horario })
+    .eq("id", Number(id));
+
+  if (error) {
+    console.error(error);
+    if (error.code === "23505") {
+      return alert("Esse horário acabou de ser reservado. Escolha outro horário.");
+    }
+    return alert("Não foi possível alterar o horário.");
+  }
+
+  closeModal();
+  await renderAdminAgendamentos();
+  alert(`Horário alterado com sucesso! 💗\\n\\nNovo horário: ${horario}`);
 };
 
 window.adminCorrigirProcedimento = async function(id) {
