@@ -2331,12 +2331,21 @@ window.adminNovoAgendamento = async function (clienteSelecionadoId = null) {
         </select>
       </label>
       <button class="secondary full" onclick="adminNovoCadastroParaAgendamento()">➕ Novo cadastro</button>
-      <label style="display:block;margin:10px 0;">Serviço
-        <select id="adminAgServico" style="width:100%;padding:10px;" onchange="carregarHorariosAgendamentoAdmin()">
-          <option value="">Selecione o serviço</option>
-          ${SERVICES.map(s => `<option value="${escapeHtml(s[0])}">${escapeHtml(s[0])} — ${money(precoAtualServico(s[0]))}</option>`).join("")}
-        </select>
-      </label>
+      <div style="margin:10px 0;">
+        <label style="display:block;margin-bottom:8px;">Procedimento 1
+          <select id="adminAgServico" style="width:100%;padding:10px;" onchange="atualizarResumoServicosAgendamentoAdmin(); carregarHorariosAgendamentoAdmin()">
+            <option value="">Selecione o procedimento</option>
+            ${SERVICES.map(s => `<option value="${escapeHtml(s[0])}">${escapeHtml(s[0])} — ${money(precoAtualServico(s[0]))} (${formatarDuracao(duracaoServicoMinutos(s[0]))})</option>`).join("")}
+          </select>
+        </label>
+        <label style="display:block;margin-top:8px;">Procedimento 2 <small class="muted">(opcional)</small>
+          <select id="adminAgServico2" style="width:100%;padding:10px;" onchange="atualizarResumoServicosAgendamentoAdmin(); carregarHorariosAgendamentoAdmin()">
+            <option value="">Nenhum</option>
+            ${SERVICES.map(s => `<option value="${escapeHtml(s[0])}">${escapeHtml(s[0])} — ${money(precoAtualServico(s[0]))} (${formatarDuracao(duracaoServicoMinutos(s[0]))})</option>`).join("")}
+          </select>
+        </label>
+        <p id="adminAgResumoServicos" class="muted" style="margin:6px 0 0;"></p>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
         <label>Data<input id="adminAgData" type="date" min="${hoje}" style="width:100%;padding:10px;" onchange="carregarHorariosAgendamentoAdmin()"></label>
         <label>Horário<select id="adminAgHora" style="width:100%;padding:10px;" disabled onchange="atualizarRestricaoAgendamentoAdmin()"><option value="">Escolha a data e o procedimento</option></select></label>
@@ -2425,6 +2434,22 @@ window.adminAtualizarPagarDepois = function () {
   if (box) box.style.display = pagamento === "pagar_depois" ? "block" : "none";
 };
 
+
+window.atualizarResumoServicosAgendamentoAdmin = function () {
+  const s1 = document.getElementById("adminAgServico")?.value || "";
+  const s2 = document.getElementById("adminAgServico2")?.value || "";
+  const box = document.getElementById("adminAgResumoServicos");
+  if (!box) return;
+  const servicos = [s1, s2].filter(Boolean);
+  if (!servicos.length) {
+    box.textContent = "";
+    return;
+  }
+  const total = servicos.reduce((sum, s) => sum + Number(precoAtualServico(s) || 0), 0);
+  const minutos = servicos.reduce((sum, s) => sum + duracaoServicoMinutos(s), 0);
+  box.textContent = `${servicos.length} procedimento(s) · ${formatarDuracao(minutos)} · ${money(total)}`;
+};
+
 window.atualizarRestricaoAgendamentoAdmin = function () {
   const date = document.getElementById("adminAgData")?.value;
   const time = document.getElementById("adminAgHora")?.value;
@@ -2436,8 +2461,11 @@ window.atualizarRestricaoAgendamentoAdmin = function () {
 
 window.carregarHorariosAgendamentoAdmin = async function () {
   const date = document.getElementById("adminAgData")?.value;
-  const servico = document.getElementById("adminAgServico")?.value;
+  const servico1 = document.getElementById("adminAgServico")?.value;
+  const servico2 = document.getElementById("adminAgServico2")?.value || "";
+  const servico = [servico1, servico2].filter(Boolean).join(" + ");
   const select = document.getElementById("adminAgHora");
+  atualizarResumoServicosAgendamentoAdmin();
   if (!select) return;
   select.innerHTML = `<option value="">Carregando...</option>`;
   select.disabled = true;
@@ -2500,13 +2528,18 @@ window.carregarHorariosAgendamentoAdmin = async function () {
 
 window.adminSalvarNovoAgendamento = async function () {
   const clienteId = Number(document.getElementById("adminAgCliente")?.value);
-  const servico = document.getElementById("adminAgServico")?.value;
+  const servico1 = document.getElementById("adminAgServico")?.value;
+  const servico2 = document.getElementById("adminAgServico2")?.value || "";
+  const servico = [servico1, servico2].filter(Boolean).join(" + ");
   const data = document.getElementById("adminAgData")?.value;
   const horario = document.getElementById("adminAgHora")?.value;
   const pagamento = document.getElementById("adminAgPagamento")?.value;
   const pagarAte = document.getElementById("adminAgPagarAte")?.value || null;
-  if (!clienteId || !servico || !data || !horario || !pagamento) {
+  if (!clienteId || !servico1 || !data || !horario || !pagamento) {
     return alert("Preencha cliente, serviço, data, horário e forma de pagamento.");
+  }
+  if (servico2 && servico2 === servico1) {
+    return alert("Escolha dois procedimentos diferentes.");
   }
   if (pagamento === "pagar_depois" && !pagarAte) {
     return alert("Escolha até que data o pagamento será realizado.");
