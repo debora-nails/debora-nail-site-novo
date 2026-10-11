@@ -717,13 +717,22 @@ async function confirmarAgendamento() {
   });
 
   if (error) {
-    console.error(error);
+    console.error("Erro ao finalizar agendamento:", error);
     if (error.code === "23505") {
       alert("Esse horário acabou de ser reservado por outra cliente. Escolha outro horário.");
       await carregarHorariosDisponiveis();
       return;
     }
-    alert("Não foi possível realizar o agendamento. Tente novamente.");
+    const msg = String(error.message || "").toLowerCase();
+    if (error.code === "42703" || msg.includes("forma_pagamento") || msg.includes("data_vencimento") || msg.includes("pagamento_status") || msg.includes("troco_para") || msg.includes("troco")) {
+      alert("O agendamento não foi salvo porque a parte de pagamento do banco de dados não está compatível com o site. Nenhum horário foi reservado.");
+      return;
+    }
+    if (error.code === "42501" || msg.includes("permission") || msg.includes("row-level security")) {
+      alert("O agendamento não foi salvo por uma permissão do banco de dados. Nenhum horário foi reservado.");
+      return;
+    }
+    alert("Não foi possível realizar o agendamento. Nenhum horário foi reservado. Tente novamente.");
     return;
   }
 
@@ -2871,13 +2880,26 @@ window.adminMarcarAgendamento = async function(id, status) {
       }
     }
     if (a && a.forma_pagamento !== "pagar_depois") {
-      await client.from("entradas_financeiro").upsert({
-        agendamento_id:a.id, cliente_id:a.cliente_id, servico:a.servico, data:a.data, valor:precoAtualServico(a.servico), forma_pagamento:a.forma_pagamento, desconto:0, status:"pago"
+      const valor = precoAtualServico(a.servico);
+      const { error: entradaError } = await client.from("entradas_financeiro").upsert({
+        agendamento_id:a.id, cliente_id:a.cliente_id, servico:a.servico, data:a.data, valor, forma_pagamento:a.forma_pagamento, desconto:0, status:"pago"
       }, {onConflict:"agendamento_id"});
-      await client.from("agendamentos").update({pagamento_status:"pago"}).eq("id", id);
+      if (entradaError) {
+        console.error("Erro ao lançar entrada financeira:", entradaError);
+        return alert("Atendimento marcado como realizado, mas não consegui registrar o pagamento no financeiro. O atendimento foi mantido como realizado; confira o Financeiro antes de tentar lançar novamente.");
+      }
+      const { error: pagamentoStatusError } = await client.from("agendamentos").update({pagamento_status:"pago"}).eq("id", id);
+      if (pagamentoStatusError) {
+        console.error("Erro ao atualizar status do pagamento:", pagamentoStatusError);
+        return alert("Atendimento realizado e valor lançado no financeiro, mas não consegui atualizar o status do pagamento. Confira este atendimento no Financeiro.");
+      }
     } else if (a) {
       const valor = precoAtualServico(a.servico);
-      await client.from("contas_receber").upsert({agendamento_id:a.id, cliente_id:a.cliente_id, valor_original:valor, valor_pago:0, saldo:valor, data_vencimento:a.data_vencimento || null, status:"pendente"}, {onConflict:"agendamento_id"});
+      const { error: receberError } = await client.from("contas_receber").upsert({agendamento_id:a.id, cliente_id:a.cliente_id, valor_original:valor, valor_pago:0, saldo:valor, data_vencimento:a.data_vencimento || null, status:"pendente"}, {onConflict:"agendamento_id"});
+      if (receberError) {
+        console.error("Erro ao criar conta a receber:", receberError);
+        return alert("Atendimento marcado como realizado, mas não consegui criar a conta a receber. O atendimento foi mantido como realizado; confira o Financeiro.");
+      }
     }
   }
   renderAdminAgendamentos();
@@ -2974,10 +2996,16 @@ async function finMostrarReceber(){
 window.finRegistrarPagamento=async function(id){
   const valor=Number((prompt('Valor pago agora:')||'').replace(',','.')); if(!Number.isFinite(valor)||valor<=0)return alert('Valor inválido.'); const forma=prompt('Forma de pagamento: pix, dinheiro, debito ou credito')||'pix'; const data=prompt('Data (AAAA-MM-DD):',finToday())||finToday(); const obs=prompt('Observação (opcional):')||''; const client=adminClient();
   const {data:r,error:e}=await client.from('contas_receber').select('*').eq('id',id).single(); if(e||!r)return alert('Conta não encontrada.'); if(valor>Number(r.saldo))return alert('O pagamento não pode ser maior que o saldo.');
-  const {error}=await client.from('pagamentos_receber').insert({conta_receber_id:id,data,valor,forma_pagamento:forma,observacoes:obs}); if(error){console.error(error);return alert('Não foi possível registrar o pagamento.');}
-  const novoPago=Number(r.valor_pago||0)+valor, novoSaldo=Number(r.valor_original)-novoPago; await client.from('contas_receber').update({valor_pago:novoPago,saldo:novoSaldo,status:novoSaldo<=0?'pago':'parcial'}).eq('id',id);
-  if(novoSaldo<=0 && r.agendamento_id) await client.from('agendamentos').update({pagamento_status:'pago'}).eq('id',r.agendamento_id);
-  await client.from('entradas_financeiro').insert({agendamento_id:r.agendamento_id||null,cliente_id:r.cliente_id,servico:r.servico||'Pagamento de dívida',data,valor,forma_pagamento:forma,desconto:0,status:'pago',observacoes:obs});
+  const {error:pagamentoError}=await client.from('pagamentos_receber').insert({conta_receber_id:id,data,valor,forma_pagamento:forma,observacoes:obs}); if(pagamentoError){console.error(pagamentoError);return alert('Não foi possível registrar o pagamento. Nenhuma alteração financeira foi feita.');}
+  const novoPago=Number(r.valor_pago||0)+valor, novoSaldo=Number(r.valor_original)-novoPago;
+  const {error:contaError}=await client.from('contas_receber').update({valor_pago:novoPago,saldo:novoSaldo,status:novoSaldo<=0?'pago':'parcial'}).eq('id',id);
+  if(contaError){console.error(contaError);return alert('O pagamento foi registrado, mas não consegui atualizar o saldo da conta. Confira esta conta antes de registrar novamente.');}
+  if(novoSaldo<=0 && r.agendamento_id){
+    const {error:agError}=await client.from('agendamentos').update({pagamento_status:'pago'}).eq('id',r.agendamento_id);
+    if(agError){console.error(agError);return alert('Pagamento registrado e conta quitada, mas não consegui atualizar o status do agendamento. Confira o atendimento.');}
+  }
+  const {error:entradaError}=await client.from('entradas_financeiro').insert({agendamento_id:r.agendamento_id||null,cliente_id:r.cliente_id,servico:r.servico||'Pagamento de dívida',data,valor,forma_pagamento:forma,desconto:0,status:'pago',observacoes:obs});
+  if(entradaError){console.error(entradaError);return alert('Pagamento registrado e conta atualizada, mas não consegui lançar a entrada no financeiro. Confira o Financeiro antes de registrar novamente.');}
   finMostrarReceber();
 };
 
