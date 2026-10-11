@@ -2989,8 +2989,70 @@ window.finNovaDespesa=async function(){
 };
 
 async function finMostrarReceber(){
-  const box=document.getElementById('financeiroConteudo'); if(!box)return; const client=adminClient(); const {data}=await client.from('contas_receber').select('*').order('status').order('data_vencimento'); const ids=[...new Set((data||[]).map(x=>x.cliente_id).filter(Boolean))]; let cs=[]; if(ids.length){const r=await client.from('Clientes').select('id,nome,whatsapp').in('id',ids);cs=r.data||[];} const cm=new Map(cs.map(c=>[c.id,c]));
-  box.innerHTML=`<h4>📌 Contas a receber</h4>${(data||[]).map(x=>{const c=cm.get(x.cliente_id);return `<div style="padding:14px;border:1px solid #ead7df;border-radius:14px;margin:8px 0;"><strong>${escapeHtml(c?.nome||'Cliente')}</strong><br>Valor: ${finMoney(x.valor_original)} · Pago: ${finMoney(x.valor_pago)} · <strong>Falta: ${finMoney(x.saldo)}</strong><br>Vencimento: ${x.data_vencimento?finDate(x.data_vencimento):'A combinar'}<br>Status: ${escapeHtml(x.status)}<div style="margin-top:8px;display:flex;gap:7px;flex-wrap:wrap;"><button class="primary small" onclick="finRegistrarPagamento(${x.id})">+ Registrar pagamento</button><button class="secondary small" onclick="finDefinirVencimento(${x.id})">📅 Definir vencimento</button><button class="secondary small" onclick="finHistoricoConta(${x.id})">📜 Histórico</button></div></div>`}).join('')||'<p>Ninguém está devendo no momento. 💗</p>'}`;
+  const box=document.getElementById('financeiroConteudo'); if(!box)return;
+  const client=adminClient();
+  const {data,error}=await client.from('contas_receber').select('*').order('status').order('data_vencimento');
+  if(error){console.error(error);box.innerHTML='<p>Não foi possível carregar as contas a receber.</p>';return;}
+
+  const contas=data||[];
+  const ids=[...new Set(contas.map(x=>x.cliente_id).filter(Boolean))];
+  let cs=[];
+  if(ids.length){const r=await client.from('Clientes').select('id,nome,whatsapp').in('id',ids);cs=r.data||[];}
+  const cm=new Map(cs.map(c=>[c.id,c]));
+
+  const agIds=[...new Set(contas.map(x=>x.agendamento_id).filter(Boolean))];
+  let ags=[];
+  if(agIds.length){const r=await client.from('agendamentos').select('id,cliente_id,servico,data,horario').in('id',agIds);ags=r.data||[];}
+  const am=new Map(ags.map(a=>[a.id,a]));
+
+  const grupos=new Map();
+  contas.forEach(x=>{
+    const chave=x.cliente_id ? `cliente-${x.cliente_id}` : `conta-${x.id}`;
+    if(!grupos.has(chave)) grupos.set(chave,{clienteId:x.cliente_id,cliente:cm.get(x.cliente_id),contas:[]});
+    grupos.get(chave).contas.push(x);
+  });
+
+  const gruposArray=[...grupos.values()].sort((a,b)=>{
+    const aP=a.contas.some(x=>String(x.status||'').toLowerCase()!=='pago');
+    const bP=b.contas.some(x=>String(x.status||'').toLowerCase()!=='pago');
+    if(aP!==bP)return aP?-1:1;
+    return String(a.cliente?.nome||'Cliente').localeCompare(String(b.cliente?.nome||'Cliente'),'pt-BR');
+  });
+
+  const html=gruposArray.map((g,index)=>{
+    const totalOriginal=g.contas.reduce((s,x)=>s+Number(x.valor_original||0),0);
+    const totalPago=g.contas.reduce((s,x)=>s+Number(x.valor_pago||0),0);
+    const totalSaldo=g.contas.reduce((s,x)=>s+Number(x.saldo||0),0);
+    const nome=escapeHtml(g.cliente?.nome||'Cliente');
+    const detalhes=g.contas.map(x=>{
+      const a=am.get(x.agendamento_id);
+      const servico=escapeHtml(a?.servico||x.servico||'Atendimento');
+      const dataAtendimento=a?.data?finDate(a.data):'';
+      const horario=a?.horario?String(a.horario).slice(0,5):'';
+      const status=String(x.status||'').toLowerCase();
+      const quitada=Number(x.saldo||0)<=0 || status==='pago';
+      return `<div style="padding:10px 0;border-top:1px solid #f0e3e8;">
+        <div><strong>${servico}</strong>${dataAtendimento?` · ${dataAtendimento}`:''}${horario?` · ${horario}`:''}</div>
+        <div style="font-size:.92em;margin-top:3px;">Valor: ${finMoney(x.valor_original)} · Pago: ${finMoney(x.valor_pago)} · <strong>Falta: ${finMoney(x.saldo)}</strong></div>
+        <div style="font-size:.88em;margin-top:3px;">Vencimento: ${x.data_vencimento?finDate(x.data_vencimento):'A combinar'} · Status: ${escapeHtml(x.status||'pendente')}</div>
+        <div style="margin-top:7px;display:flex;gap:7px;flex-wrap:wrap;">
+          ${quitada?'':`<button class="primary small" onclick="finRegistrarPagamento(${x.id})">+ Registrar pagamento</button>`}
+          <button class="secondary small" onclick="finDefinirVencimento(${x.id})">📅 Definir vencimento</button>
+          <button class="secondary small" onclick="finHistoricoConta(${x.id})">📜 Histórico</button>
+        </div>
+      </div>`;
+    }).join('');
+
+    return `<details style="padding:14px;border:1px solid #ead7df;border-radius:14px;margin:8px 0;background:#fff;" ${index===0 && totalSaldo>0?'open':''}>
+      <summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+        <span><strong>${nome}</strong><br><small>${g.contas.length} atendimento${g.contas.length===1?'':'s'} registrado${g.contas.length===1?'':'s'}</small></span>
+        <span style="text-align:right;">Total: <strong>${finMoney(totalOriginal)}</strong> · Pago: ${finMoney(totalPago)} · <strong>Falta: ${finMoney(totalSaldo)}</strong></span>
+      </summary>
+      <div style="margin-top:10px;">${detalhes}</div>
+    </details>`;
+  }).join('');
+
+  box.innerHTML=`<h4>📌 Contas a receber</h4><p class="muted">As contas ficam agrupadas por cliente. Clique no nome para ver os atendimentos e dar baixa em cada um.</p>${html||'<p>Ninguém está devendo no momento. 💗</p>'}`;
 }
 
 window.finRegistrarPagamento=async function(id){
