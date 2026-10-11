@@ -579,13 +579,15 @@ async function openBooking(index = null) {
 
     <p id="bookingPaymentStatus" class="muted"></p>
 
-    <button class="primary full" onclick="confirmarAgendamento()">
-      AGENDAR HORÁRIO
-    </button>
+    <div id="bookingActions" style="scroll-margin-top:20px;">
+      <button class="primary full" onclick="confirmarAgendamento()">
+        AGENDAR HORÁRIO
+      </button>
 
-    <button class="secondary full" onclick="abrirWhatsAppAgendamento()">
-      CONTINUAR PELO WHATSAPP
-    </button>
+      <button class="secondary full" onclick="abrirWhatsAppAgendamento()">
+        CONTINUAR PELO WHATSAPP
+      </button>
+    </div>
     <div id="bookingEncaixeBox" style="display:none;margin-top:8px;">
       <button class="secondary full" onclick="solicitarEncaixeWhatsApp()">💬 SOLICITAR ENCAIXE PELO WHATSAPP</button>
     </div>
@@ -623,6 +625,15 @@ function atualizarPagamentoAgendamento() {
     const result = document.getElementById("bookingTrocoResultado");
     if (input) input.value = "";
     if (result) result.textContent = "";
+  }
+
+  // No celular, a caixa de pagamento/troco pode empurrar os botões para fora da área visível.
+  // Ao escolher a forma de pagamento, leva os botões de finalização para a tela sem alterar a lógica do agendamento.
+  const actions = document.getElementById("bookingActions");
+  if (payment && actions) {
+    setTimeout(() => {
+      actions.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 80);
   }
 }
 
