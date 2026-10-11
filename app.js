@@ -3052,8 +3052,70 @@ async function finMostrarReceber(){
     </details>`;
   }).join('');
 
-  box.innerHTML=`<h4>📌 Contas a receber</h4><p class="muted">As contas ficam agrupadas por cliente. Clique no nome para ver os atendimentos e dar baixa em cada um.</p>${html||'<p>Ninguém está devendo no momento. 💗</p>'}`;
+  box.innerHTML=`<div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center;"><h4>📌 Contas a receber</h4><button class="primary small" onclick="finNovaContaReceber()">+ Nova conta a receber</button></div><p class="muted">As contas ficam agrupadas por cliente. Clique no nome para ver os atendimentos e dar baixa em cada um.</p>${html||'<p>Ninguém está devendo no momento. 💗</p>'}`;
 }
+
+window.finNovaContaReceber=async function(){
+  const client=adminClient();
+  const {data:clientes,error:clientesError}=await client.from('Clientes').select('id,nome,whatsapp').order('nome');
+  if(clientesError){console.error(clientesError);return alert('Não foi possível carregar as clientes.');}
+  const lista=clientes||[];
+  if(!lista.length)return alert('Nenhuma cliente cadastrada ainda.');
+
+  const linhas=lista.map(c=>`<option value="${c.id}">${escapeHtml(c.nome||'Cliente')}${c.whatsapp?` — ${escapeHtml(c.whatsapp)}`:''}</option>`).join('');
+  const box=document.getElementById('financeiroConteudo');
+  if(!box)return;
+  box.innerHTML=`
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;">
+      <h4>➕ Nova conta a receber</h4>
+      <button class="secondary small" onclick="finMostrarReceber()">↩️ Voltar</button>
+    </div>
+    <p class="muted">Use para registrar uma dívida de um atendimento que foi feito por encaixe ou que não foi lançado no site.</p>
+    <div style="display:grid;gap:10px;max-width:520px;">
+      <label>Cliente
+        <select id="finNovaReceberCliente" style="width:100%;margin-top:4px;">${linhas}</select>
+      </label>
+      <label>Procedimento / descrição
+        <input id="finNovaReceberServico" type="text" placeholder="Ex.: Manicure, Pedicure ou Alongamento" style="width:100%;margin-top:4px;">
+      </label>
+      <label>Valor que deve
+        <input id="finNovaReceberValor" type="number" min="0.01" step="0.01" placeholder="Ex.: 24,00" style="width:100%;margin-top:4px;">
+      </label>
+      <label>Data combinada para pagamento
+        <input id="finNovaReceberVencimento" type="date" min="${finToday()}" style="width:100%;margin-top:4px;">
+      </label>
+      <label>Observação (opcional)
+        <input id="finNovaReceberObs" type="text" placeholder="Ex.: encaixe" style="width:100%;margin-top:4px;">
+      </label>
+      <button class="primary" onclick="finSalvarNovaContaReceber()">💾 Salvar valor a receber</button>
+    </div>`;
+};
+
+window.finSalvarNovaContaReceber=async function(){
+  const clienteId=Number(document.getElementById('finNovaReceberCliente')?.value||0);
+  const servico=(document.getElementById('finNovaReceberServico')?.value||'').trim();
+  const valor=Number(String(document.getElementById('finNovaReceberValor')?.value||'').replace(',','.'));
+  const vencimento=document.getElementById('finNovaReceberVencimento')?.value||null;
+  const observacoes=(document.getElementById('finNovaReceberObs')?.value||'').trim();
+  if(!clienteId)return alert('Escolha a cliente.');
+  if(!Number.isFinite(valor)||valor<=0)return alert('Digite um valor válido.');
+  if(!vencimento)return alert('Escolha a data combinada para pagamento.');
+  const client=adminClient();
+  const {error}=await client.from('contas_receber').insert({
+    agendamento_id:null,
+    cliente_id:clienteId,
+    servico:servico||'Atendimento avulso',
+    valor_original:valor,
+    valor_pago:0,
+    saldo:valor,
+    data_vencimento:vencimento,
+    status:'pendente',
+    observacoes:observacoes||null
+  });
+  if(error){console.error(error);return alert('Não foi possível registrar este valor a receber.');}
+  alert('Valor a receber registrado com sucesso! 💗');
+  await finMostrarReceber();
+};
 
 window.finRegistrarPagamento=async function(id){
   const valor=Number((prompt('Valor pago agora:')||'').replace(',','.')); if(!Number.isFinite(valor)||valor<=0)return alert('Valor inválido.'); const forma=prompt('Forma de pagamento: pix, dinheiro, debito ou credito')||'pix'; const data=prompt('Data (AAAA-MM-DD):',finToday())||finToday(); const obs=prompt('Observação (opcional):')||''; const client=adminClient();
