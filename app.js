@@ -389,13 +389,33 @@ function showModal(html) {
   if (!content || !modal) return;
 
   content.innerHTML = html;
+
+  // O conteúdo do modal precisa rolar dentro da própria janela no celular.
+  // Isso evita que o gesto de arrastar role a página que está atrás do modal.
+  content.style.maxHeight = "calc(100vh - 32px)";
+  content.style.overflowY = "auto";
+  content.style.overflowX = "hidden";
+  content.style.webkitOverflowScrolling = "touch";
+  content.style.touchAction = "pan-y";
+  content.style.overscrollBehavior = "contain";
+  content.style.paddingBottom = "24px";
+
   modal.classList.add("show");
 }
 
 function closeModal() {
-  document
-    .getElementById("modal")
-    ?.classList.remove("show");
+  const modal = document.getElementById("modal");
+  const content = document.getElementById("modalContent");
+  if (content) {
+    content.style.maxHeight = "";
+    content.style.overflowY = "";
+    content.style.overflowX = "";
+    content.style.webkitOverflowScrolling = "";
+    content.style.touchAction = "";
+    content.style.overscrollBehavior = "";
+    content.style.paddingBottom = "";
+  }
+  modal?.classList.remove("show");
 }
 
 async function getCurrentClient() {
