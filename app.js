@@ -382,20 +382,72 @@ function renderGallery() {
     .join("");
 }
 
+function ensureModalScrollStyles() {
+  if (document.getElementById("deboraModalScrollStyles")) return;
+  const style = document.createElement("style");
+  style.id = "deboraModalScrollStyles";
+  style.textContent = `
+    body.debora-modal-open { overflow: hidden !important; overscroll-behavior: none !important; }
+    #modal { overscroll-behavior: none !important; }
+    #modalContent {
+      max-height: calc(100vh - 32px) !important;
+      overflow-y: auto !important;
+      overflow-x: hidden !important;
+      -webkit-overflow-scrolling: touch !important;
+      overscroll-behavior: contain !important;
+      touch-action: pan-y !important;
+    }
+    .fin-procedimentos-lista {
+      display: grid;
+      gap: 7px;
+      max-height: 280px;
+      overflow-y: auto;
+      padding: 8px;
+      margin-top: 8px;
+      border: 1px solid #ead7df;
+      border-radius: 12px;
+      background: #fff;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+    .fin-procedimento-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 10px;
+      border: 1px solid #ead7df;
+      border-radius: 10px;
+      background: #fff;
+      cursor: pointer;
+    }
+    .fin-procedimento-resumo {
+      margin-top: 7px;
+      padding: 9px 10px;
+      border-radius: 10px;
+      background: #f8edf3;
+      font-size: .92em;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 function showModal(html) {
   const content = document.getElementById("modalContent");
   const modal = document.getElementById("modal");
 
   if (!content || !modal) return;
 
+  ensureModalScrollStyles();
   content.innerHTML = html;
   modal.classList.add("show");
+  document.body.classList.add("debora-modal-open");
 }
 
 function closeModal() {
   document
     .getElementById("modal")
     ?.classList.remove("show");
+  document.body.classList.remove("debora-modal-open");
 }
 
 async function getCurrentClient() {
@@ -3122,38 +3174,39 @@ window.finNovaContaReceber=async function(){
   if(!lista.length)return alert('Nenhuma cliente cadastrada ainda.');
 
   const linhas=lista.map(c=>`<option value="${c.id}">${escapeHtml(c.nome||'Cliente')}${c.whatsapp?` — ${escapeHtml(c.whatsapp)}`:''}</option>`).join('');
-  const box=document.getElementById('financeiroConteudo');
-  if(!box)return;
-  const procedimentos=SERVICES.map((s,i)=>`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;cursor:pointer;"><input class="fin-proc-check" type="checkbox" value="${escapeHtml(s[0])}" data-preco="${Number(precoAtualServico(s[0]))}" onchange="finAtualizarTotalNovaConta()"><span>${escapeHtml(s[0])}</span><strong style="margin-left:auto;">${money(precoAtualServico(s[0]))}</strong></label>`).join('');
-  box.innerHTML=`
-    <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;">
-      <h4>➕ Nova conta a receber</h4>
-      <button class="secondary small" onclick="finMostrarReceber()">↩️ Voltar</button>
-    </div>
-    <p class="muted">Escolha os procedimentos feitos, a data combinada para pagamento e deixe uma observação se precisar.</p>
-    <div style="display:grid;gap:10px;max-width:560px;">
+  const procedimentos=SERVICES.map(s=>`<label class="fin-procedimento-item"><input class="fin-proc-check" type="checkbox" value="${escapeHtml(s[0])}" data-preco="${Number(precoAtualServico(s[0]))}" onchange="finAtualizarTotalNovaConta()"><span>${escapeHtml(s[0])}</span><strong style="margin-left:auto;">${money(precoAtualServico(s[0]))}</strong></label>`).join('');
+
+  showModal(`
+    <h2>➕ Nova conta a receber</h2>
+    <p class="muted">Cadastre somente o que a cliente ainda precisa pagar.</p>
+    <div style="display:grid;gap:10px;">
       <label>Cliente
         <select id="finNovaReceberCliente" style="width:100%;margin-top:4px;">${linhas}</select>
       </label>
+
       <div>
-        <strong>Procedimentos feitos</strong>
-        <div style="display:grid;gap:7px;margin-top:6px;">${procedimentos}</div>
+        <details id="finNovaProcedimentosBox">
+          <summary style="cursor:pointer;font-weight:700;padding:10px;border:1px solid #ead7df;border-radius:10px;background:#fff;">💅 Procedimentos — <span id="finNovaProcedimentosResumo">nenhum selecionado</span></summary>
+          <div class="fin-procedimentos-lista">${procedimentos}</div>
+        </details>
         <label style="display:block;margin-top:8px;">Outro procedimento/descrição (opcional)
           <input id="finNovaReceberOutro" type="text" placeholder="Ex.: decoração" style="width:100%;margin-top:4px;">
         </label>
+        <div id="finNovaReceberTotal" class="fin-procedimento-resumo">Escolha os procedimentos para calcular o valor.</div>
       </div>
+
       <label>Valor que deve
         <input id="finNovaReceberValor" type="number" min="0.01" step="0.01" placeholder="Será preenchido pelos procedimentos" style="width:100%;margin-top:4px;">
       </label>
-      <div id="finNovaReceberTotal" class="muted" style="padding:10px;border-radius:10px;background:#f8edf3;">Selecione os procedimentos para calcular o valor.</div>
       <label>Data combinada para pagamento
         <input id="finNovaReceberVencimento" type="date" min="${finToday()}" style="width:100%;margin-top:4px;">
       </label>
       <label>Observação (opcional)
-        <textarea id="finNovaReceberObs" rows="3" placeholder="Ex.: encaixe, pagamento combinado para sexta-feira..." style="width:100%;margin-top:4px;"></textarea>
+        <textarea id="finNovaReceberObs" rows="3" placeholder="Ex.: pagamento combinado para sexta-feira..." style="width:100%;margin-top:4px;"></textarea>
       </label>
-      <button class="primary" onclick="finSalvarNovaContaReceber()">💾 Salvar valor a receber</button>
-    </div>`;
+      <button class="primary full" onclick="finSalvarNovaContaReceber()">💾 Salvar valor a receber</button>
+      <button class="secondary full" onclick="closeModal()">Cancelar</button>
+    </div>`);
 };
 
 window.finAtualizarTotalNovaConta=function(){
@@ -3161,8 +3214,11 @@ window.finAtualizarTotalNovaConta=function(){
   const total=checks.reduce((s,c)=>s+Number(c.dataset.preco||0),0);
   const valor=document.getElementById('finNovaReceberValor');
   if(valor && total>0) valor.value=total.toFixed(2);
+  const nomes=checks.map(c=>c.value);
+  const resumo=document.getElementById('finNovaProcedimentosResumo');
+  if(resumo) resumo.textContent=nomes.length ? `${nomes.length} selecionado(s)` : 'nenhum selecionado';
   const box=document.getElementById('finNovaReceberTotal');
-  if(box) box.innerHTML=checks.length ? `<strong>${checks.length} procedimento(s)</strong> · Total sugerido: <strong>${finMoney(total)}</strong>` : 'Selecione os procedimentos para calcular o valor.';
+  if(box) box.innerHTML=nomes.length ? `<strong>${nomes.join(' + ')}</strong><br>Total sugerido: <strong>${finMoney(total)}</strong>` : 'Escolha os procedimentos para calcular o valor.';
 };
 
 window.finSalvarNovaContaReceber=async function(){
@@ -3204,13 +3260,17 @@ window.finEditarContaReceber=async function(id){
   if(ce)return alert('Não foi possível carregar as clientes.');
   const nomesProcedimentos=new Set(String(r.servico||'').split(' + ').map(x=>x.trim()).filter(Boolean));
   const linhas=(clientes||[]).map(c=>`<option value="${c.id}" ${Number(c.id)===Number(r.cliente_id)?'selected':''}>${escapeHtml(c.nome||'Cliente')}${c.whatsapp?` — ${escapeHtml(c.whatsapp)}`:''}</option>`).join('');
-  const procedimentos=SERVICES.map(s=>`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;"><input class="fin-edit-proc-check" type="checkbox" value="${escapeHtml(s[0])}" data-preco="${Number(precoAtualServico(s[0]))}" ${nomesProcedimentos.has(s[0])?'checked':''} onchange="finAtualizarTotalEditarConta()"><span>${escapeHtml(s[0])}</span><strong style="margin-left:auto;">${money(precoAtualServico(s[0]))}</strong></label>`).join('');
+  const procedimentos=SERVICES.map(s=>`<label class="fin-procedimento-item"><input class="fin-edit-proc-check" type="checkbox" value="${escapeHtml(s[0])}" data-preco="${Number(precoAtualServico(s[0]))}" ${nomesProcedimentos.has(s[0])?'checked':''} onchange="finAtualizarTotalEditarConta()"><span>${escapeHtml(s[0])}</span><strong style="margin-left:auto;">${money(precoAtualServico(s[0]))}</strong></label>`).join('');
   const conhecidos=new Set(SERVICES.map(s=>s[0]));
   const outro=[...nomesProcedimentos].filter(x=>!conhecidos.has(x)).join(' + ');
   showModal(`
     <h2>✏️ Corrigir conta a receber</h2>
     <label>Cliente<select id="finEditCliente" style="width:100%;padding:10px;margin-top:4px;">${linhas}</select></label>
-    <div style="margin-top:10px;"><strong>Procedimentos feitos</strong><div style="display:grid;gap:7px;margin-top:6px;">${procedimentos}</div>
+    <div style="margin-top:10px;">
+      <details id="finEditProcedimentosBox" open>
+        <summary style="cursor:pointer;font-weight:700;padding:10px;border:1px solid #ead7df;border-radius:10px;background:#fff;">💅 Procedimentos — <span id="finEditProcedimentosResumo">${nomesProcedimentos.size} selecionado(s)</span></summary>
+        <div class="fin-procedimentos-lista">${procedimentos}</div>
+      </details>
       <input id="finEditOutro" type="text" value="${escapeHtml(outro)}" placeholder="Outro procedimento/descrição" style="width:100%;margin-top:8px;padding:10px;">
     </div>
     <label style="display:block;margin-top:10px;">Valor que deve<input id="finEditValor" type="number" min="0.01" step="0.01" value="${Number(r.valor_original||0)}" style="width:100%;padding:10px;margin-top:4px;"></label>
@@ -3220,13 +3280,17 @@ window.finEditarContaReceber=async function(id){
     <button class="primary full" style="margin-top:12px;" onclick="finSalvarEdicaoContaReceber(${id})">💾 Salvar correção</button>
     <button class="secondary full" style="margin-top:8px;" onclick="closeModal()">Cancelar</button>
   `);
+  finAtualizarTotalEditarConta();
 };
 
 window.finAtualizarTotalEditarConta=function(){
   const checks=[...document.querySelectorAll('.fin-edit-proc-check:checked')];
   const total=checks.reduce((s,c)=>s+Number(c.dataset.preco||0),0);
+  const nomes=checks.map(c=>c.value);
+  const resumo=document.getElementById('finEditProcedimentosResumo');
+  if(resumo) resumo.textContent=nomes.length ? `${nomes.length} selecionado(s)` : 'nenhum selecionado';
   const box=document.getElementById('finEditTotal');
-  if(box)box.innerHTML=checks.length?`Total sugerido pelos procedimentos: <strong>${finMoney(total)}</strong>`:'Você pode corrigir o valor manualmente.';
+  if(box)box.innerHTML=nomes.length?`<strong>${nomes.join(' + ')}</strong><br>Total sugerido pelos procedimentos: <strong>${finMoney(total)}</strong>`:'Você pode corrigir o valor manualmente.';
 };
 
 window.finSalvarEdicaoContaReceber=async function(id){
