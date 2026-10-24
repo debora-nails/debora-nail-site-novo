@@ -389,33 +389,13 @@ function showModal(html) {
   if (!content || !modal) return;
 
   content.innerHTML = html;
-
-  // O conteúdo do modal precisa rolar dentro da própria janela no celular.
-  // Isso evita que o gesto de arrastar role a página que está atrás do modal.
-  content.style.maxHeight = "calc(100vh - 32px)";
-  content.style.overflowY = "auto";
-  content.style.overflowX = "hidden";
-  content.style.webkitOverflowScrolling = "touch";
-  content.style.touchAction = "pan-y";
-  content.style.overscrollBehavior = "contain";
-  content.style.paddingBottom = "24px";
-
   modal.classList.add("show");
 }
 
 function closeModal() {
-  const modal = document.getElementById("modal");
-  const content = document.getElementById("modalContent");
-  if (content) {
-    content.style.maxHeight = "";
-    content.style.overflowY = "";
-    content.style.overflowX = "";
-    content.style.webkitOverflowScrolling = "";
-    content.style.touchAction = "";
-    content.style.overscrollBehavior = "";
-    content.style.paddingBottom = "";
-  }
-  modal?.classList.remove("show");
+  document
+    .getElementById("modal")
+    ?.classList.remove("show");
 }
 
 async function getCurrentClient() {
@@ -534,6 +514,19 @@ async function openBooking(index = null) {
     <h2>Agendar horário</h2>
     <p class="muted">Escolha o serviço, a data e um dos horários liberados pela Débora.</p>
 
+    <label style="display:block;margin:0 0 10px;">O atendimento é para você?
+      <select id="bookingForSelf" style="width:100%;padding:10px;" onchange="atualizarDestinatarioAgendamento()">
+        <option value="sim">Sim, é para mim</option>
+        <option value="nao">Não, é para outra pessoa</option>
+      </select>
+    </label>
+    <div id="bookingRecipientBox" style="display:none;margin:0 0 10px;">
+      <label>Nome de quem fará o atendimento
+        <input id="bookingRecipientName" type="text" placeholder="Nome da pessoa" style="width:100%;padding:10px;" autocomplete="name" oninput="atualizarDestinatarioAgendamento()">
+      </label>
+      <p id="bookingRecipientStatus" class="muted" style="margin:5px 0 0;"></p>
+    </div>
+
     <div>
       <strong>Procedimentos</strong>
       <div id="bookingRestrictionNotice" style="display:none;margin:7px 0;padding:9px;border-radius:10px;background:#fff1f6;border:1px solid #ead7df;"></div>
@@ -612,6 +605,7 @@ async function openBooking(index = null) {
       <button class="secondary full" onclick="solicitarEncaixeWhatsApp()">💬 SOLICITAR ENCAIXE PELO WHATSAPP</button>
     </div>
   `);
+  atualizarDestinatarioAgendamento();
   atualizarOpcaoEncaixe();
   atualizarResumoServicosAgendamento();
   atualizarRestricaoDoHorario();
@@ -670,6 +664,35 @@ function calcularTrocoAgendamento() {
   result.textContent = `Troco: ${money(trocoPara - valor)}`;
 }
 
+async function atualizarDestinatarioAgendamento() {
+  const modo=document.getElementById("bookingForSelf")?.value || "sim";
+  const box=document.getElementById("bookingRecipientBox");
+  if(box) box.style.display=modo==="nao" ? "block" : "none";
+  if(modo!=="nao") return;
+  const nome=document.getElementById("bookingRecipientName")?.value.trim();
+  const status=document.getElementById("bookingRecipientStatus");
+  if(status) status.textContent=nome ? "Ao confirmar, o site vai procurar essa pessoa na lista de clientes para atribuir o atendimento e o ponto." : "Digite o nome da pessoa que fará o atendimento.";
+}
+
+async function resolverClienteDestinatario(clienteLogado) {
+  const modo=document.getElementById("bookingForSelf")?.value || "sim";
+  if(modo!=="nao") return clienteLogado;
+  const nome=(document.getElementById("bookingRecipientName")?.value||"").trim();
+  if(!nome) { alert("Digite o nome da pessoa que fará o atendimento."); return null; }
+  const client=adminClient();
+  const {data:existente,error}=await client.from("Clientes").select("id,nome,whatsapp,email,is_admin,permite_pagamento_posterior").ilike("nome",nome).limit(1).maybeSingle();
+  if(error){ console.error(error); alert("Não foi possível localizar a pessoa do atendimento."); return null; }
+  if(existente) return existente;
+  // Se ainda não existe cadastro, cria um registro simples de cliente para que o atendimento e o ponto fiquem na pessoa correta.
+  const {data:novo,error:criarError}=await client.rpc("criar_cliente_destinatario", { p_nome:nome });
+  if(criarError || !novo){
+    console.error(criarError);
+    alert("Essa pessoa ainda não está cadastrada como cliente. Cadastre o nome dela na Área Administrativa e tente novamente.");
+    return null;
+  }
+  return Array.isArray(novo) ? novo[0] : novo;
+}
+
 async function confirmarAgendamento() {
   const selecionados = servicosSelecionadosAgendamento();
   const date = document.getElementById("bookingDate")?.value;
@@ -709,6 +732,8 @@ async function confirmarAgendamento() {
     alert("Entre na sua Área VIP para realizar o agendamento.");
     return;
   }
+  const clienteAtendimento = await resolverClienteDestinatario(cliente);
+  if (!clienteAtendimento) return;
   if (payment === "pagar_depois" && !cliente.permite_pagamento_posterior) {
     alert("O pagamento posterior não está liberado para este cadastro.");
     return;
@@ -735,7 +760,7 @@ async function confirmarAgendamento() {
   }
 
   const { error } = await client.from("agendamentos").insert({
-    cliente_id: cliente.id,
+    cliente_id: clienteAtendimento.id,
     servico,
     data: date,
     horario: time,
@@ -768,7 +793,8 @@ async function confirmarAgendamento() {
   }
 
   closeModal();
-  alert(`Agendamento realizado com sucesso! 💗\n\n${selecionados.join(" + ")}\n${date.split("-").reverse().join("/")}\nInício: ${time}\nDuração: ${formatarDuracao(duracaoTotal)}\nTérmino previsto: ${minutosParaHora(fimNovo)}${payment === "pagar_depois" ? `\nPagar até: ${pagarAte.split("-").reverse().join("/")}` : ""}`);
+  const nomeAtendimento = clienteAtendimento.id !== cliente.id ? `\nPara: ${clienteAtendimento.nome}` : "";
+  alert(`Agendamento realizado com sucesso! 💗${nomeAtendimento}\n\n${selecionados.join(" + ")}\n${date.split("-").reverse().join("/")}\nInício: ${time}\nDuração: ${formatarDuracao(duracaoTotal)}\nTérmino previsto: ${minutosParaHora(fimNovo)}${payment === "pagar_depois" ? `\nPagar até: ${pagarAte.split("-").reverse().join("/")}` : ""}`);
 }
 
 function atualizarOpcaoEncaixe() {
@@ -1100,8 +1126,8 @@ window.vipCadastro = async function () {
   const email = document.getElementById("vipEmailCadastro")?.value.trim();
   const password = document.getElementById("vipPasswordCadastro")?.value;
 
-  if (!nome || !whatsapp || !email || !password) {
-    alert("Preencha todos os campos.");
+  if (!nome || !email || !password) {
+    alert("Preencha nome, e-mail e senha. O WhatsApp é opcional.");
     return;
   }
 
@@ -1124,7 +1150,7 @@ window.vipCadastro = async function () {
       .insert({
         id: Date.now(),
         nome,
-        whatsapp,
+        whatsapp: whatsapp || "",
         email,
         user_id: data.user.id
       })
@@ -2438,8 +2464,8 @@ window.adminSalvarNovoCadastro = async function () {
   // Primeiro usa a função administrativa já existente.
   ({ data, error } = await client.rpc("admin_criar_cliente_manual", {
     p_nome: nome,
-    p_whatsapp: whatsapp,
-    p_email: email
+    p_whatsapp: whatsapp || "",
+    p_email: email || ""
   }));
 
   // Se a função administrativa estiver indisponível, tenta o cadastro direto
@@ -3025,7 +3051,9 @@ async function finMostrarReceber(){
   const {data,error}=await client.from('contas_receber').select('*').order('status').order('data_vencimento');
   if(error){console.error(error);box.innerHTML='<p>Não foi possível carregar as contas a receber.</p>';return;}
 
-  const contas=data||[];
+  // Na lista "A receber" entram somente contas que ainda possuem saldo.
+  // Contas totalmente pagas continuam no banco e no histórico, mas saem desta lista para não embolar.
+  const contas=(data||[]).filter(x=>Number(x.saldo||0)>0 && String(x.status||'').toLowerCase()!=='pago');
   const ids=[...new Set(contas.map(x=>x.cliente_id).filter(Boolean))];
   let cs=[];
   if(ids.length){const r=await client.from('Clientes').select('id,nome,whatsapp').in('id',ids);cs=r.data||[];}
@@ -3064,11 +3092,11 @@ async function finMostrarReceber(){
       const quitada=Number(x.saldo||0)<=0 || status==='pago';
       return `<div style="padding:10px 0;border-top:1px solid #f0e3e8;">
         <div><strong>${servico}</strong>${dataAtendimento?` · ${dataAtendimento}`:''}${horario?` · ${horario}`:''}</div>
-        <div style="font-size:.92em;margin-top:3px;">Valor: ${finMoney(x.valor_original)} · Pago: ${finMoney(x.valor_pago)} · <strong>Falta: ${finMoney(x.saldo)}</strong></div>
+        <div style="font-size:.92em;margin-top:3px;"><strong>Falta pagar: ${finMoney(x.saldo)}</strong></div>
         <div style="font-size:.88em;margin-top:3px;">Vencimento: ${x.data_vencimento?finDate(x.data_vencimento):'A combinar'} · Status: ${escapeHtml(x.status||'pendente')}</div>
         <div style="margin-top:7px;display:flex;gap:7px;flex-wrap:wrap;">
           ${quitada?'':`<button class="primary small" onclick="finRegistrarPagamento(${x.id})">+ Registrar pagamento</button>`}
-          <button class="secondary small" onclick="finDefinirVencimento(${x.id})">📅 Definir vencimento</button>
+          <button class="secondary small" onclick="finEditarContaReceber(${x.id})">✏️ Corrigir</button><button class="secondary small" onclick="finDefinirVencimento(${x.id})">📅 Definir vencimento</button>
           <button class="secondary small" onclick="finHistoricoConta(${x.id})">📜 Histórico</button>
         </div>
       </div>`;
@@ -3077,7 +3105,7 @@ async function finMostrarReceber(){
     return `<details style="padding:14px;border:1px solid #ead7df;border-radius:14px;margin:8px 0;background:#fff;" ${index===0 && totalSaldo>0?'open':''}>
       <summary style="cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
         <span><strong>${nome}</strong><br><small>${g.contas.length} atendimento${g.contas.length===1?'':'s'} registrado${g.contas.length===1?'':'s'}</small></span>
-        <span style="text-align:right;">Total: <strong>${finMoney(totalOriginal)}</strong> · Pago: ${finMoney(totalPago)} · <strong>Falta: ${finMoney(totalSaldo)}</strong></span>
+        <span style="text-align:right;"><strong>Falta pagar: ${finMoney(totalSaldo)}</strong></span>
       </summary>
       <div style="margin-top:10px;">${detalhes}</div>
     </details>`;
@@ -3096,46 +3124,64 @@ window.finNovaContaReceber=async function(){
   const linhas=lista.map(c=>`<option value="${c.id}">${escapeHtml(c.nome||'Cliente')}${c.whatsapp?` — ${escapeHtml(c.whatsapp)}`:''}</option>`).join('');
   const box=document.getElementById('financeiroConteudo');
   if(!box)return;
+  const procedimentos=SERVICES.map((s,i)=>`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;cursor:pointer;"><input class="fin-proc-check" type="checkbox" value="${escapeHtml(s[0])}" data-preco="${Number(precoAtualServico(s[0]))}" onchange="finAtualizarTotalNovaConta()"><span>${escapeHtml(s[0])}</span><strong style="margin-left:auto;">${money(precoAtualServico(s[0]))}</strong></label>`).join('');
   box.innerHTML=`
     <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;">
       <h4>➕ Nova conta a receber</h4>
       <button class="secondary small" onclick="finMostrarReceber()">↩️ Voltar</button>
     </div>
-    <p class="muted">Use para registrar uma dívida de um atendimento que foi feito por encaixe ou que não foi lançado no site.</p>
-    <div style="display:grid;gap:10px;max-width:520px;">
+    <p class="muted">Escolha os procedimentos feitos, a data combinada para pagamento e deixe uma observação se precisar.</p>
+    <div style="display:grid;gap:10px;max-width:560px;">
       <label>Cliente
         <select id="finNovaReceberCliente" style="width:100%;margin-top:4px;">${linhas}</select>
       </label>
-      <label>Procedimento / descrição
-        <input id="finNovaReceberServico" type="text" placeholder="Ex.: Manicure, Pedicure ou Alongamento" style="width:100%;margin-top:4px;">
-      </label>
+      <div>
+        <strong>Procedimentos feitos</strong>
+        <div style="display:grid;gap:7px;margin-top:6px;">${procedimentos}</div>
+        <label style="display:block;margin-top:8px;">Outro procedimento/descrição (opcional)
+          <input id="finNovaReceberOutro" type="text" placeholder="Ex.: decoração" style="width:100%;margin-top:4px;">
+        </label>
+      </div>
       <label>Valor que deve
-        <input id="finNovaReceberValor" type="number" min="0.01" step="0.01" placeholder="Ex.: 24,00" style="width:100%;margin-top:4px;">
+        <input id="finNovaReceberValor" type="number" min="0.01" step="0.01" placeholder="Será preenchido pelos procedimentos" style="width:100%;margin-top:4px;">
       </label>
+      <div id="finNovaReceberTotal" class="muted" style="padding:10px;border-radius:10px;background:#f8edf3;">Selecione os procedimentos para calcular o valor.</div>
       <label>Data combinada para pagamento
         <input id="finNovaReceberVencimento" type="date" min="${finToday()}" style="width:100%;margin-top:4px;">
       </label>
       <label>Observação (opcional)
-        <input id="finNovaReceberObs" type="text" placeholder="Ex.: encaixe" style="width:100%;margin-top:4px;">
+        <textarea id="finNovaReceberObs" rows="3" placeholder="Ex.: encaixe, pagamento combinado para sexta-feira..." style="width:100%;margin-top:4px;"></textarea>
       </label>
       <button class="primary" onclick="finSalvarNovaContaReceber()">💾 Salvar valor a receber</button>
     </div>`;
 };
 
+window.finAtualizarTotalNovaConta=function(){
+  const checks=[...document.querySelectorAll('.fin-proc-check:checked')];
+  const total=checks.reduce((s,c)=>s+Number(c.dataset.preco||0),0);
+  const valor=document.getElementById('finNovaReceberValor');
+  if(valor && total>0) valor.value=total.toFixed(2);
+  const box=document.getElementById('finNovaReceberTotal');
+  if(box) box.innerHTML=checks.length ? `<strong>${checks.length} procedimento(s)</strong> · Total sugerido: <strong>${finMoney(total)}</strong>` : 'Selecione os procedimentos para calcular o valor.';
+};
+
 window.finSalvarNovaContaReceber=async function(){
   const clienteId=Number(document.getElementById('finNovaReceberCliente')?.value||0);
-  const servico=(document.getElementById('finNovaReceberServico')?.value||'').trim();
+  const selecionados=[...document.querySelectorAll('.fin-proc-check:checked')].map(x=>x.value);
+  const outro=(document.getElementById('finNovaReceberOutro')?.value||'').trim();
+  const servico=[...selecionados,...(outro?[outro]:[])].join(' + ');
   const valor=Number(String(document.getElementById('finNovaReceberValor')?.value||'').replace(',','.'));
   const vencimento=document.getElementById('finNovaReceberVencimento')?.value||null;
   const observacoes=(document.getElementById('finNovaReceberObs')?.value||'').trim();
   if(!clienteId)return alert('Escolha a cliente.');
+  if(!servico)return alert('Escolha pelo menos um procedimento ou informe uma descrição.');
   if(!Number.isFinite(valor)||valor<=0)return alert('Digite um valor válido.');
   if(!vencimento)return alert('Escolha a data combinada para pagamento.');
   const client=adminClient();
   const {error}=await client.from('contas_receber').insert({
     agendamento_id:null,
     cliente_id:clienteId,
-    servico:servico||'Atendimento avulso',
+    servico,
     valor_original:valor,
     valor_pago:0,
     saldo:valor,
@@ -3145,6 +3191,63 @@ window.finSalvarNovaContaReceber=async function(){
   });
   if(error){console.error(error);return alert('Não foi possível registrar este valor a receber.');}
   alert('Valor a receber registrado com sucesso! 💗');
+  await finMostrarReceber();
+};
+
+window.finEditarContaReceber=async function(id){
+  const client=adminClient();
+  const [{data:r,error:e},{data:clientes,error:ce}]=await Promise.all([
+    client.from('contas_receber').select('*').eq('id',id).single(),
+    client.from('Clientes').select('id,nome,whatsapp').order('nome')
+  ]);
+  if(e||!r)return alert('Conta não encontrada.');
+  if(ce)return alert('Não foi possível carregar as clientes.');
+  const nomesProcedimentos=new Set(String(r.servico||'').split(' + ').map(x=>x.trim()).filter(Boolean));
+  const linhas=(clientes||[]).map(c=>`<option value="${c.id}" ${Number(c.id)===Number(r.cliente_id)?'selected':''}>${escapeHtml(c.nome||'Cliente')}${c.whatsapp?` — ${escapeHtml(c.whatsapp)}`:''}</option>`).join('');
+  const procedimentos=SERVICES.map(s=>`<label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid #ead7df;border-radius:10px;background:#fff;"><input class="fin-edit-proc-check" type="checkbox" value="${escapeHtml(s[0])}" data-preco="${Number(precoAtualServico(s[0]))}" ${nomesProcedimentos.has(s[0])?'checked':''} onchange="finAtualizarTotalEditarConta()"><span>${escapeHtml(s[0])}</span><strong style="margin-left:auto;">${money(precoAtualServico(s[0]))}</strong></label>`).join('');
+  const conhecidos=new Set(SERVICES.map(s=>s[0]));
+  const outro=[...nomesProcedimentos].filter(x=>!conhecidos.has(x)).join(' + ');
+  showModal(`
+    <h2>✏️ Corrigir conta a receber</h2>
+    <label>Cliente<select id="finEditCliente" style="width:100%;padding:10px;margin-top:4px;">${linhas}</select></label>
+    <div style="margin-top:10px;"><strong>Procedimentos feitos</strong><div style="display:grid;gap:7px;margin-top:6px;">${procedimentos}</div>
+      <input id="finEditOutro" type="text" value="${escapeHtml(outro)}" placeholder="Outro procedimento/descrição" style="width:100%;margin-top:8px;padding:10px;">
+    </div>
+    <label style="display:block;margin-top:10px;">Valor que deve<input id="finEditValor" type="number" min="0.01" step="0.01" value="${Number(r.valor_original||0)}" style="width:100%;padding:10px;margin-top:4px;"></label>
+    <div id="finEditTotal" class="muted" style="margin-top:7px;padding:9px;border-radius:10px;background:#f8edf3;">Você pode corrigir o valor manualmente.</div>
+    <label style="display:block;margin-top:10px;">Data combinada para pagamento<input id="finEditVencimento" type="date" value="${r.data_vencimento||''}" style="width:100%;padding:10px;margin-top:4px;"></label>
+    <label style="display:block;margin-top:10px;">Observação<textarea id="finEditObs" rows="3" style="width:100%;padding:10px;margin-top:4px;">${escapeHtml(r.observacoes||'')}</textarea></label>
+    <button class="primary full" style="margin-top:12px;" onclick="finSalvarEdicaoContaReceber(${id})">💾 Salvar correção</button>
+    <button class="secondary full" style="margin-top:8px;" onclick="closeModal()">Cancelar</button>
+  `);
+};
+
+window.finAtualizarTotalEditarConta=function(){
+  const checks=[...document.querySelectorAll('.fin-edit-proc-check:checked')];
+  const total=checks.reduce((s,c)=>s+Number(c.dataset.preco||0),0);
+  const box=document.getElementById('finEditTotal');
+  if(box)box.innerHTML=checks.length?`Total sugerido pelos procedimentos: <strong>${finMoney(total)}</strong>`:'Você pode corrigir o valor manualmente.';
+};
+
+window.finSalvarEdicaoContaReceber=async function(id){
+  const cliente_id=Number(document.getElementById('finEditCliente')?.value||0);
+  const selecionados=[...document.querySelectorAll('.fin-edit-proc-check:checked')].map(x=>x.value);
+  const outro=(document.getElementById('finEditOutro')?.value||'').trim();
+  const servico=[...selecionados,...(outro?[outro]:[])].join(' + ');
+  const valor=Number(String(document.getElementById('finEditValor')?.value||'').replace(',','.'));
+  const data_vencimento=document.getElementById('finEditVencimento')?.value||null;
+  const observacoes=(document.getElementById('finEditObs')?.value||'').trim();
+  if(!cliente_id||!servico)return alert('Informe a cliente e pelo menos um procedimento/descrição.');
+  if(!Number.isFinite(valor)||valor<=0)return alert('Digite um valor válido.');
+  const {data:r,error:re}=await client.from('contas_receber').select('valor_pago').eq('id',id).single();
+  if(re||!r)return alert('Não foi possível localizar a conta.');
+  const valorPago=Number(r.valor_pago||0);
+  if(valor<valorPago)return alert(`O valor da conta não pode ser menor que o que já foi pago (${finMoney(valorPago)}).`);
+  const saldo=Math.max(0,valor-valorPago);
+  const status=saldo<=0?'pago':'parcial';
+  const {error}=await client.from('contas_receber').update({cliente_id,servico,valor_original:valor,saldo,status,data_vencimento,observacoes:observacoes||null}).eq('id',id);
+  if(error){console.error(error);return alert('Não foi possível salvar a correção.');}
+  closeModal();
   await finMostrarReceber();
 };
 
