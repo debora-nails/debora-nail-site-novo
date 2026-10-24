@@ -3174,7 +3174,6 @@ window.finNovaContaReceber=async function(){
   if(!lista.length)return alert('Nenhuma cliente cadastrada ainda.');
 
   const linhas=lista.map(c=>`<option value="${c.id}">${escapeHtml(c.nome||'Cliente')}${c.whatsapp?` — ${escapeHtml(c.whatsapp)}`:''}</option>`).join('');
-  const procedimentos=SERVICES.map(s=>`<label class="fin-procedimento-item"><input class="fin-proc-check" type="checkbox" value="${escapeHtml(s[0])}" data-preco="${Number(precoAtualServico(s[0]))}" onchange="finAtualizarTotalNovaConta()"><span>${escapeHtml(s[0])}</span><strong style="margin-left:auto;">${money(precoAtualServico(s[0]))}</strong></label>`).join('');
 
   showModal(`
     <h2>➕ Nova conta a receber</h2>
@@ -3183,20 +3182,11 @@ window.finNovaContaReceber=async function(){
       <label>Cliente
         <select id="finNovaReceberCliente" style="width:100%;margin-top:4px;">${linhas}</select>
       </label>
-
-      <div>
-        <details id="finNovaProcedimentosBox">
-          <summary style="cursor:pointer;font-weight:700;padding:10px;border:1px solid #ead7df;border-radius:10px;background:#fff;">💅 Procedimentos — <span id="finNovaProcedimentosResumo">nenhum selecionado</span></summary>
-          <div class="fin-procedimentos-lista">${procedimentos}</div>
-        </details>
-        <label style="display:block;margin-top:8px;">Outro procedimento/descrição (opcional)
-          <input id="finNovaReceberOutro" type="text" placeholder="Ex.: decoração" style="width:100%;margin-top:4px;">
-        </label>
-        <div id="finNovaReceberTotal" class="fin-procedimento-resumo">Escolha os procedimentos para calcular o valor.</div>
-      </div>
-
+      <label>Procedimento / descrição
+        <input id="finNovaReceberServico" type="text" placeholder="Ex.: Pedicure, Manicure + Pedicure, encaixe..." style="width:100%;margin-top:4px;">
+      </label>
       <label>Valor que deve
-        <input id="finNovaReceberValor" type="number" min="0.01" step="0.01" placeholder="Será preenchido pelos procedimentos" style="width:100%;margin-top:4px;">
+        <input id="finNovaReceberValor" type="number" min="0.01" step="0.01" placeholder="Ex.: 48,00" style="width:100%;margin-top:4px;">
       </label>
       <label>Data combinada para pagamento
         <input id="finNovaReceberVencimento" type="date" min="${finToday()}" style="width:100%;margin-top:4px;">
@@ -3209,35 +3199,20 @@ window.finNovaContaReceber=async function(){
     </div>`);
 };
 
-window.finAtualizarTotalNovaConta=function(){
-  const checks=[...document.querySelectorAll('.fin-proc-check:checked')];
-  const total=checks.reduce((s,c)=>s+Number(c.dataset.preco||0),0);
-  const valor=document.getElementById('finNovaReceberValor');
-  if(valor && total>0) valor.value=total.toFixed(2);
-  const nomes=checks.map(c=>c.value);
-  const resumo=document.getElementById('finNovaProcedimentosResumo');
-  if(resumo) resumo.textContent=nomes.length ? `${nomes.length} selecionado(s)` : 'nenhum selecionado';
-  const box=document.getElementById('finNovaReceberTotal');
-  if(box) box.innerHTML=nomes.length ? `<strong>${nomes.join(' + ')}</strong><br>Total sugerido: <strong>${finMoney(total)}</strong>` : 'Escolha os procedimentos para calcular o valor.';
-};
-
 window.finSalvarNovaContaReceber=async function(){
   const clienteId=Number(document.getElementById('finNovaReceberCliente')?.value||0);
-  const selecionados=[...document.querySelectorAll('.fin-proc-check:checked')].map(x=>x.value);
-  const outro=(document.getElementById('finNovaReceberOutro')?.value||'').trim();
-  const servico=[...selecionados,...(outro?[outro]:[])].join(' + ');
+  const servico=(document.getElementById('finNovaReceberServico')?.value||'').trim();
   const valor=Number(String(document.getElementById('finNovaReceberValor')?.value||'').replace(',','.'));
   const vencimento=document.getElementById('finNovaReceberVencimento')?.value||null;
   const observacoes=(document.getElementById('finNovaReceberObs')?.value||'').trim();
   if(!clienteId)return alert('Escolha a cliente.');
-  if(!servico)return alert('Escolha pelo menos um procedimento ou informe uma descrição.');
   if(!Number.isFinite(valor)||valor<=0)return alert('Digite um valor válido.');
   if(!vencimento)return alert('Escolha a data combinada para pagamento.');
   const client=adminClient();
   const {error}=await client.from('contas_receber').insert({
     agendamento_id:null,
     cliente_id:clienteId,
-    servico,
+    servico:servico||'Atendimento avulso',
     valor_original:valor,
     valor_pago:0,
     saldo:valor,
@@ -3258,50 +3233,38 @@ window.finEditarContaReceber=async function(id){
   ]);
   if(e||!r)return alert('Conta não encontrada.');
   if(ce)return alert('Não foi possível carregar as clientes.');
-  const nomesProcedimentos=new Set(String(r.servico||'').split(' + ').map(x=>x.trim()).filter(Boolean));
   const linhas=(clientes||[]).map(c=>`<option value="${c.id}" ${Number(c.id)===Number(r.cliente_id)?'selected':''}>${escapeHtml(c.nome||'Cliente')}${c.whatsapp?` — ${escapeHtml(c.whatsapp)}`:''}</option>`).join('');
-  const procedimentos=SERVICES.map(s=>`<label class="fin-procedimento-item"><input class="fin-edit-proc-check" type="checkbox" value="${escapeHtml(s[0])}" data-preco="${Number(precoAtualServico(s[0]))}" ${nomesProcedimentos.has(s[0])?'checked':''} onchange="finAtualizarTotalEditarConta()"><span>${escapeHtml(s[0])}</span><strong style="margin-left:auto;">${money(precoAtualServico(s[0]))}</strong></label>`).join('');
-  const conhecidos=new Set(SERVICES.map(s=>s[0]));
-  const outro=[...nomesProcedimentos].filter(x=>!conhecidos.has(x)).join(' + ');
   showModal(`
     <h2>✏️ Corrigir conta a receber</h2>
-    <label>Cliente<select id="finEditCliente" style="width:100%;padding:10px;margin-top:4px;">${linhas}</select></label>
-    <div style="margin-top:10px;">
-      <details id="finEditProcedimentosBox" open>
-        <summary style="cursor:pointer;font-weight:700;padding:10px;border:1px solid #ead7df;border-radius:10px;background:#fff;">💅 Procedimentos — <span id="finEditProcedimentosResumo">${nomesProcedimentos.size} selecionado(s)</span></summary>
-        <div class="fin-procedimentos-lista">${procedimentos}</div>
-      </details>
-      <input id="finEditOutro" type="text" value="${escapeHtml(outro)}" placeholder="Outro procedimento/descrição" style="width:100%;margin-top:8px;padding:10px;">
+    <div style="display:grid;gap:10px;">
+      <label>Cliente
+        <select id="finEditCliente" style="width:100%;padding:10px;margin-top:4px;">${linhas}</select>
+      </label>
+      <label>Procedimento / descrição
+        <input id="finEditServico" type="text" value="${escapeHtml(r.servico||'')}" placeholder="Ex.: Pedicure, encaixe..." style="width:100%;padding:10px;margin-top:4px;">
+      </label>
+      <label>Valor que deve
+        <input id="finEditValor" type="number" min="0.01" step="0.01" value="${Number(r.valor_original||0)}" style="width:100%;padding:10px;margin-top:4px;">
+      </label>
+      <label>Data combinada para pagamento
+        <input id="finEditVencimento" type="date" value="${r.data_vencimento||''}" style="width:100%;padding:10px;margin-top:4px;">
+      </label>
+      <label>Observação
+        <textarea id="finEditObs" rows="3" style="width:100%;padding:10px;margin-top:4px;">${escapeHtml(r.observacoes||'')}</textarea>
+      </label>
+      <button class="primary full" onclick="finSalvarEdicaoContaReceber(${id})">💾 Salvar correção</button>
+      <button class="secondary full" onclick="closeModal()">Cancelar</button>
     </div>
-    <label style="display:block;margin-top:10px;">Valor que deve<input id="finEditValor" type="number" min="0.01" step="0.01" value="${Number(r.valor_original||0)}" style="width:100%;padding:10px;margin-top:4px;"></label>
-    <div id="finEditTotal" class="muted" style="margin-top:7px;padding:9px;border-radius:10px;background:#f8edf3;">Você pode corrigir o valor manualmente.</div>
-    <label style="display:block;margin-top:10px;">Data combinada para pagamento<input id="finEditVencimento" type="date" value="${r.data_vencimento||''}" style="width:100%;padding:10px;margin-top:4px;"></label>
-    <label style="display:block;margin-top:10px;">Observação<textarea id="finEditObs" rows="3" style="width:100%;padding:10px;margin-top:4px;">${escapeHtml(r.observacoes||'')}</textarea></label>
-    <button class="primary full" style="margin-top:12px;" onclick="finSalvarEdicaoContaReceber(${id})">💾 Salvar correção</button>
-    <button class="secondary full" style="margin-top:8px;" onclick="closeModal()">Cancelar</button>
   `);
-  finAtualizarTotalEditarConta();
-};
-
-window.finAtualizarTotalEditarConta=function(){
-  const checks=[...document.querySelectorAll('.fin-edit-proc-check:checked')];
-  const total=checks.reduce((s,c)=>s+Number(c.dataset.preco||0),0);
-  const nomes=checks.map(c=>c.value);
-  const resumo=document.getElementById('finEditProcedimentosResumo');
-  if(resumo) resumo.textContent=nomes.length ? `${nomes.length} selecionado(s)` : 'nenhum selecionado';
-  const box=document.getElementById('finEditTotal');
-  if(box)box.innerHTML=nomes.length?`<strong>${nomes.join(' + ')}</strong><br>Total sugerido pelos procedimentos: <strong>${finMoney(total)}</strong>`:'Você pode corrigir o valor manualmente.';
 };
 
 window.finSalvarEdicaoContaReceber=async function(id){
   const cliente_id=Number(document.getElementById('finEditCliente')?.value||0);
-  const selecionados=[...document.querySelectorAll('.fin-edit-proc-check:checked')].map(x=>x.value);
-  const outro=(document.getElementById('finEditOutro')?.value||'').trim();
-  const servico=[...selecionados,...(outro?[outro]:[])].join(' + ');
+  const servico=(document.getElementById('finEditServico')?.value||'').trim() || 'Atendimento avulso';
   const valor=Number(String(document.getElementById('finEditValor')?.value||'').replace(',','.'));
   const data_vencimento=document.getElementById('finEditVencimento')?.value||null;
   const observacoes=(document.getElementById('finEditObs')?.value||'').trim();
-  if(!cliente_id||!servico)return alert('Informe a cliente e pelo menos um procedimento/descrição.');
+  if(!cliente_id)return alert('Informe a cliente.');
   if(!Number.isFinite(valor)||valor<=0)return alert('Digite um valor válido.');
   const {data:r,error:re}=await client.from('contas_receber').select('valor_pago').eq('id',id).single();
   if(re||!r)return alert('Não foi possível localizar a conta.');
