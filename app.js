@@ -3259,6 +3259,7 @@ window.finEditarContaReceber=async function(id){
 };
 
 window.finSalvarEdicaoContaReceber=async function(id){
+  const client=adminClient();
   const cliente_id=Number(document.getElementById('finEditCliente')?.value||0);
   const servico=(document.getElementById('finEditServico')?.value||'').trim() || 'Atendimento avulso';
   const valor=Number(String(document.getElementById('finEditValor')?.value||'').replace(',','.'));
