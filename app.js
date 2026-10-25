@@ -504,17 +504,26 @@ async function carregarHorariosDisponiveis() {
   const [y,m,d] = date.split("-").map(Number);
   const diaSemana = new Date(y, m - 1, d).getDay();
   const horarioPadraoDoDia = diaSemana >= 1 && diaSemana <= 6 ? HORARIOS_PADRAO : [];
-  const horarioConfigPorHora = new Map((horarios || []).map(item => [String(item.horario || "").slice(0,5), item]));
-  window.__horariosConfiguradosAgendamento = horarios || [];
-  const bloqueados = new Set((horarios || [])
+  // Guardamos cada horário salvo no dia, inclusive os horários avulsos.
+  // Alguns navegadores/Supabase podem devolver o campo time em formatos diferentes;
+  // normalizamos sempre para HH:MM antes de montar as opções.
+  const horariosDoBanco = (horarios || [])
+    .map(item => ({
+      ...item,
+      horario: String(item.horario || "").slice(0,5)
+    }))
+    .filter(item => /^\d{2}:\d{2}$/.test(item.horario));
+  window.__horariosConfiguradosAgendamento = horariosDoBanco;
+  const bloqueados = new Set(horariosDoBanco
     .filter(item => item.disponivel === false)
-    .map(item => String(item.horario || "").slice(0,5)));
+    .map(item => item.horario));
 
-  // Mostra somente os horários padrão definidos pela Débora.
-  // Se ela adicionar um horário avulso na Área da Débora, esse horário também entra aqui.
-  // Não cria horários intermediários automaticamente (08:00, 10:00, 12:00 etc.).
-  const horariosConfigurados = (horarios || []).map(item => String(item.horario || "").slice(0,5)).filter(Boolean);
-  const candidatos = [...new Set([...horarioPadraoDoDia, ...horariosConfigurados])];
+  // Os horários padrão continuam disponíveis normalmente.
+  // Todo horário avulso salvo pela Débora também entra na lista, sem criar
+  // horários intermediários automaticamente.
+  const horariosConfigurados = horariosDoBanco.map(item => item.horario);
+  const candidatos = [...new Set([...horarioPadraoDoDia, ...horariosConfigurados])]
+    .sort((a, b) => horaParaMinutos(a) - horaParaMinutos(b));
 
   const agendamentosAtivos = (agendados || []).filter(item => {
     const s = String(item.status || "").trim().toLowerCase();
