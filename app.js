@@ -1,33 +1,5 @@
 
 Carregando mensagens mais antigas…
-noa
-Kkkkk 😂 você quis dizer “não”? Se sim, me fala o que você quis dizer que eu acompanho. ❤️
-
-Não mas por exemplo o atendimento que eu tinha 18h30 era uma hora que era manicure então 19h30 eu já acabei ele e a mesma coisa o de 17h30 o horário que eu tinha agendado de 16h30 era manicure que é uma hora então era pro 17h30 tá liberado ué
-SIM! 😂 Você está certíssima. Eu que interpretei errado na resposta anterior.
-
-Se:
-
-16:30 → Manicure = 1 hora
-termina 17:30
-então 17:30 deveria estar livre.
-E:
-
-18:30 → Manicure = 1 hora
-termina 19:30
-então 19:40 deveria estar livre também.
-Inclusive, conferi o V25: o sistema está configurado para considerar Manicure = 60 minutos e Pedicure = 60 minutos. 
-
-E na própria lógica de disponibilidade ele calcula o fim do atendimento usando essa duração. 
-
-Então não é para esses horários desaparecerem por causa do atendimento anterior. Você está certa.
-
-O que temos é um bug na forma como os horários avulsos estão sendo carregados/filtrados na tela de marcação. O código até diz explicitamente que os horários adicionados por você deveriam entrar junto com os horários padrão. 
-
-👉 Agora eu vou mexer somente nisso: fazer os horários avulsos que você adicionar aparecerem corretamente na marcação, mantendo a regra de duração de 1h para manicure/pedicure e 2h para os demais.
-
-Não vou mexer em nenhuma outra função do site. ❤️
-
 Ok
 Pronto! ❤️ Fiz somente a correção dos horários avulsos no V26.
 
@@ -48,10 +20,6 @@ Agora é só colocar esse V26 no lugar do app.js atual e testar aqueles seus hor
 
 app_DEBORA_SITE_CORRIGIDO_HORARIOS_V26_HORARIOS_AVULSOS.txt
 Documento
-
-
-
-Anúncio
 Me dá opção de apagar da parte de agendamento as pessoas que faltou
 Sim! ❤️ Dá para fazer, e eu fiz de um jeito seguro.
 
@@ -73,6 +41,36 @@ E não mexi na parte dos horários avulsos nem nas outras funções. ❤️
 
 app_DEBORA_SITE_CORRIGIDO_HORARIOS_V27_FALTAS_APAGAR_DA_LISTA.txt
 Documento
+Hoje agora jeito aqui ó na questão de pagamento de valor receber. Aí eu coloquei a pessoa, a mesma pessoa, só que eu coloquei o procedimento duas vezes. Como que eu faço pra pagar um? Me dá a opção de apagar? Porque pode acontecer de eu errar, né? Mais vezes de outra pessoa e colocar a mesma coisa pra pagar duas vezes. Aí me dá a opção de apagar um
+Sim! 💗 E nesse caso faz sentido ter “🗑️ Apagar” em cada conta.
+
+Fiz a alteração de forma segura: se você cadastrar a mesma cliente e o mesmo procedimento duas vezes por engano, pode apagar só aquela conta duplicada, sem apagar a cliente nem o agendamento.
+
+Também deixei uma proteção: se aquela conta já tiver algum pagamento registrado, o botão não deixa apagar para não bagunçar o financeiro.
+
+V28 — Apagar conta a receber
+No A receber, vai aparecer assim:
+
+🗑️ Apagar
+
+Você clica → confirma → aquela cobrança sai da lista. 💗
+
+Essa alteração foi feita em cima da V27, sem mexer nas outras funções.
+
+
+app_DEBORA_SITE_CORRIGIDO_HORARIOS_V28_FINANCEIRO_APAGAR_CONTA_RECEBER.txt
+Documento
+
+
+
+Anúncio
+Eu acho que por enquanto é só isso
+Sim kkkkk ❤️ Acho que por enquanto fechamos então.
+
+E melhor parar por aqui mesmo, porque o site já está com bastante coisa funcionando e você está usando com clientes. Quanto menos mexer sem necessidade, melhor. 😅
+
+Quando aparecer alguma coisa que realmente esteja faltando ou algum probleminha, a gente mexe só naquela parte, sem sair alterando o resto. 💅🏻💗
+
 let SERVICES = [
 
   [
@@ -3261,6 +3259,7 @@ async function finMostrarReceber(){
         <div style="margin-top:7px;display:flex;gap:7px;flex-wrap:wrap;">
           ${quitada?'':`<button class="primary small" onclick="finRegistrarPagamento(${x.id})">+ Registrar pagamento</button>`}
           <button class="secondary small" onclick="finEditarContaReceber(${x.id})">✏️ Corrigir</button><button class="secondary small" onclick="finDefinirVencimento(${x.id})">📅 Definir vencimento</button>
+          <button class="secondary small" onclick="finApagarContaReceber(${x.id})">🗑️ Apagar</button>
           <button class="secondary small" onclick="finHistoricoConta(${x.id})">📜 Histórico</button>
         </div>
       </div>`;
@@ -3388,6 +3387,21 @@ window.finSalvarEdicaoContaReceber=async function(id){
   const {error}=await client.from('contas_receber').update({cliente_id,servico,valor_original:valor,saldo,status,data_vencimento,observacoes:observacoes||null}).eq('id',id);
   if(error){console.error(error);return alert('Não foi possível salvar a correção.');}
   closeModal();
+  await finMostrarReceber();
+};
+
+window.finApagarContaReceber=async function(id){
+  const client=adminClient();
+  const {data:r,error:e}=await client.from('contas_receber').select('id,valor_pago,cliente_id,servico').eq('id',id).single();
+  if(e||!r)return alert('Conta não encontrada.');
+  const valorPago=Number(r.valor_pago||0);
+  if(valorPago>0){
+    return alert('Esta conta já tem pagamento registrado. Para não apagar movimentações financeiras por engano, primeiro corrija/estorne o pagamento.');
+  }
+  const confirmar=confirm(`Apagar esta conta a receber?\n\n${r.servico||'Atendimento'}\n\nEla será retirada da lista de valores a receber. Esta ação não apaga a cliente nem o agendamento.`);
+  if(!confirmar)return;
+  const {error}=await client.from('contas_receber').delete().eq('id',id);
+  if(error){console.error(error);return alert('Não foi possível apagar esta conta.');}
   await finMostrarReceber();
 };
 
