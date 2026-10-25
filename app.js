@@ -1,3 +1,78 @@
+
+Carregando mensagens mais antigas…
+noa
+Kkkkk 😂 você quis dizer “não”? Se sim, me fala o que você quis dizer que eu acompanho. ❤️
+
+Não mas por exemplo o atendimento que eu tinha 18h30 era uma hora que era manicure então 19h30 eu já acabei ele e a mesma coisa o de 17h30 o horário que eu tinha agendado de 16h30 era manicure que é uma hora então era pro 17h30 tá liberado ué
+SIM! 😂 Você está certíssima. Eu que interpretei errado na resposta anterior.
+
+Se:
+
+16:30 → Manicure = 1 hora
+termina 17:30
+então 17:30 deveria estar livre.
+E:
+
+18:30 → Manicure = 1 hora
+termina 19:30
+então 19:40 deveria estar livre também.
+Inclusive, conferi o V25: o sistema está configurado para considerar Manicure = 60 minutos e Pedicure = 60 minutos. 
+
+E na própria lógica de disponibilidade ele calcula o fim do atendimento usando essa duração. 
+
+Então não é para esses horários desaparecerem por causa do atendimento anterior. Você está certa.
+
+O que temos é um bug na forma como os horários avulsos estão sendo carregados/filtrados na tela de marcação. O código até diz explicitamente que os horários adicionados por você deveriam entrar junto com os horários padrão. 
+
+👉 Agora eu vou mexer somente nisso: fazer os horários avulsos que você adicionar aparecerem corretamente na marcação, mantendo a regra de duração de 1h para manicure/pedicure e 2h para os demais.
+
+Não vou mexer em nenhuma outra função do site. ❤️
+
+Ok
+Pronto! ❤️ Fiz somente a correção dos horários avulsos no V26.
+
+Agora ele:
+
+mantém os horários padrão;
+pega também todos os horários avulsos salvos;
+normaliza o horário para HH:MM;
+coloca tudo em ordem de horário;
+continua respeitando a duração de cada procedimento;
+não mexi em financeiro, clientes, VIP, pagamentos ou qualquer outra parte.
+Também conferi a sintaxe e está tudo certinho. ✅
+
+V26 — Horários avulsos corrigidos:
+
+Agora é só colocar esse V26 no lugar do app.js atual e testar aqueles seus horários de encaixe.
+
+
+app_DEBORA_SITE_CORRIGIDO_HORARIOS_V26_HORARIOS_AVULSOS.txt
+Documento
+
+
+
+Anúncio
+Me dá opção de apagar da parte de agendamento as pessoas que faltou
+Sim! ❤️ Dá para fazer, e eu fiz de um jeito seguro.
+
+V27 — tirar “Faltou” da lista
+Agora, quando você marcar uma cliente como ⚠️ Faltou, vai aparecer:
+
+✖ Tirar da lista
+
+Ao clicar:
+
+ela sai da tela principal de Agendamentos;
+não é apagada do banco;
+continua no histórico da cliente;
+o registro continua com status Faltou.
+É exatamente a mesma ideia que já existe para os cancelados. 
+
+E não mexi na parte dos horários avulsos nem nas outras funções. ❤️
+
+
+app_DEBORA_SITE_CORRIGIDO_HORARIOS_V27_FALTAS_APAGAR_DA_LISTA.txt
+Documento
 let SERVICES = [
 
   [
@@ -2302,9 +2377,22 @@ function adminAgendamentosOcultosKey() {
   return "debora_nail_agendamentos_cancelados_ocultos_v1";
 }
 
+function adminFaltasOcultasKey() {
+  return "debora_nail_agendamentos_faltas_ocultas_v1";
+}
+
 function adminLerAgendamentosOcultos() {
   try {
     const dados = JSON.parse(localStorage.getItem(adminAgendamentosOcultosKey()) || "[]");
+    return new Set(Array.isArray(dados) ? dados.map(Number).filter(Number.isFinite) : []);
+  } catch (_) {
+    return new Set();
+  }
+}
+
+function adminLerFaltasOcultas() {
+  try {
+    const dados = JSON.parse(localStorage.getItem(adminFaltasOcultasKey()) || "[]");
     return new Set(Array.isArray(dados) ? dados.map(Number).filter(Number.isFinite) : []);
   } catch (_) {
     return new Set();
@@ -2318,6 +2406,16 @@ function adminOcultarAgendamentoCancelado(id) {
   const ocultos = adminLerAgendamentosOcultos();
   ocultos.add(numero);
   localStorage.setItem(adminAgendamentosOcultosKey(), JSON.stringify([...ocultos]));
+  renderAdminAgendamentos();
+}
+
+function adminOcultarAgendamentoFaltou(id) {
+  const numero = Number(id);
+  if (!Number.isFinite(numero)) return;
+  if (!confirm("Tirar este atendimento que faltou da lista?\n\nEle NÃO será apagado do histórico da cliente nem do banco de dados.")) return;
+  const ocultos = adminLerFaltasOcultas();
+  ocultos.add(numero);
+  localStorage.setItem(adminFaltasOcultasKey(), JSON.stringify([...ocultos]));
   renderAdminAgendamentos();
 }
 
@@ -2337,11 +2435,13 @@ async function renderAdminAgendamentos() {
 
     let agendamentos = Array.isArray(data) ? data : (Array.isArray(data?.agendamentos) ? data.agendamentos : []);
     const ocultos = adminLerAgendamentosOcultos();
+    const faltasOcultas = adminLerFaltasOcultas();
 
-    // Cancelados que você já tirou da lista continuam no banco e no histórico,
+    // Cancelados e faltas que você já tirou da lista continuam no banco e no histórico,
     // mas não aparecem novamente nesta tela administrativa.
     agendamentos = agendamentos.filter(a => !(
-      String(a.status || "").toLowerCase() === "cancelado" && ocultos.has(Number(a.id))
+      (String(a.status || "").toLowerCase() === "cancelado" && ocultos.has(Number(a.id))) ||
+      (String(a.status || "").toLowerCase() === "faltou" && faltasOcultas.has(Number(a.id)))
     ));
 
     // Atendimentos já realizados saem automaticamente da lista de Agendamentos.
@@ -2419,6 +2519,9 @@ async function renderAdminAgendamentos() {
             <div>Pagamento: ${escapeHtml(pagamento)} — ${escapeHtml(a.pagamento_status || "pendente")}${trocoInfo}${vencimentoInfo}</div>
             ${cancelado ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
               <button class="secondary small" onclick="adminOcultarAgendamentoCancelado(${Number(a.id)})">✖ Tirar da lista</button>
+            </div>` : ""}
+            ${status === "faltou" ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
+              <button class="secondary small" onclick="adminOcultarAgendamentoFaltou(${Number(a.id)})">✖ Tirar da lista</button>
             </div>` : ""}
             ${podeFechar ? `<div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:10px;">
               <button class="primary small" onclick="adminReagendarAgendamento(${Number(a.id)})">🔄 Reagendar</button>
@@ -4070,3 +4173,5 @@ configurarMeusDados();
 configurarMeusAgendamentosEAvisos();
 manterPontosVIPAtualizados();
 carregarAvisosPublicos();
+
+
